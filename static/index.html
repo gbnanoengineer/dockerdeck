@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DockerDeck</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%236ea8ff'/%3E%3Cpath d='M5 12h3v3H5zm4 0h3v3H9zm4 0h3v3h-3zM9 8h3v3H9zm4 0h3v3h-3z' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #0a0e16; --panel: #111826; --panel2: #162033; --line: #212b40; --text: #e8edf6; --muted: #8793ab;
+    --accent: #6ea8ff; --accent2: #a78bfa; --ok: #3ddc97; --warn: #ffb454; --bad: #ff6b7a; --shadow: 0 6px 24px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --bg: #f2f5fb; --panel: #ffffff; --panel2: #f6f8fd; --line: #e1e6f0; --text: #16202f; --muted: #627089;
+    --accent: #2f6bff; --accent2: #7c5cf0; --ok: #12a66a; --warn: #d9820f; --bad: #e0414f; --shadow: 0 6px 24px rgba(30,50,90,.08);
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(1200px 500px at 0% -10%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%), var(--bg);
+    color: var(--text); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  .app { display: grid; grid-template-columns: 220px 1fr; min-height: 100%; }
+  aside { background: color-mix(in srgb, var(--panel) 92%, transparent); border-right: 1px solid var(--line); padding: 16px 12px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 4px; }
+  .logo { display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px; font-weight: 700; font-size: 16px; letter-spacing: .2px; }
+  .logo i { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: grid; place-items: center; }
+  .nav { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: var(--muted); background: none; border: 0; cursor: pointer; text-align: left; width: 100%; }
+  .nav:hover { background: var(--panel2); color: var(--text); }
+  .nav.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 600; }
+  .nav .n { margin-left: auto; font-size: 12px; background: var(--panel2); padding: 0 7px; border-radius: 10px; color: var(--muted); }
+  .grow { flex: 1; }
+  .side-foot { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+  select, .field { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; outline: none; }
+  select:focus, .field:focus { border-color: var(--accent); }
+  .tools { display: flex; gap: 6px; }
+  .ib { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px; display: inline-grid; place-items: center; cursor: pointer; color: var(--muted); }
+  .ib:hover { color: var(--text); border-color: var(--accent); }
+  .ib.on { color: var(--accent); border-color: var(--accent); }
+  .ib.danger:hover { color: var(--bad); border-color: var(--bad); }
+  .ib:disabled { opacity: .4; cursor: default; }
+  svg.i { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  section.page { padding: 20px 24px 40px; max-width: 1280px; width: 100%; margin: 0 auto; }
+  .top { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .top h1 { font-size: 20px; margin: 0; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 3px 10px; font-size: 12px; color: var(--muted); }
+  .live { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 var(--ok); animation: pulse 2s infinite; }
+  .live.off { background: var(--bad); animation: none; }
+  @keyframes pulse { 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; }
+  .card > h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .card > h2 .sp, .sp { flex: 1; }
+  .pad { padding: 14px 16px; }
+  .grid4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
+  .gauge { display: flex; align-items: center; gap: 14px; padding: 14px 16px; margin: 0; }
+  .ring { position: relative; width: 78px; height: 78px; flex: none; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 8; stroke-linecap: round; }
+  .ring .bg { stroke: var(--panel2); }
+  .ring .fg { transition: stroke-dashoffset .6s ease; }
+  .ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 17px; }
+  .gauge small, .muted { color: var(--muted); }
+  .gauge .t { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+  .gauge .v { font-size: 18px; font-weight: 650; }
+  .bar { height: 6px; background: var(--panel2); border-radius: 4px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+  .bar > i.warn { background: var(--warn); } .bar > i.bad { background: var(--bad); }
+  .tip { display: flex; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .tip:last-child { border: 0; }
+  .tip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; flex: none; background: var(--ok); }
+  .tip.warn::before { background: var(--warn); } .tip.bad::before { background: var(--bad); }
+  .row { display: flex; align-items: center; gap: 12px; padding: 9px 16px; border-bottom: 1px solid var(--line); }
+  .row:last-child { border: 0; }
+  .row .name { width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+  .row .name:hover { color: var(--accent); }
+  .row .bar { flex: 1; }
+  .row .val { width: 76px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 8px 16px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { font-size: 12px; color: var(--muted); font-weight: 500; }
+  tr:last-child td { border: 0; }
+  td.r, th.r { text-align: right; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 3px 12px; cursor: pointer; color: var(--muted); }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .btn { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 12px; cursor: pointer; }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.danger:hover { border-color: var(--bad); color: var(--bad); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .ghead { display: flex; align-items: center; gap: 10px; padding: 10px 16px; cursor: pointer; border-bottom: 1px solid var(--line); user-select: none; }
+  .ghead .caret { transition: transform .15s; } .ghead.shut .caret { transform: rotate(-90deg); }
+  .ghead b { font-size: 14px; }
+  .crow { display: grid; grid-template-columns: 12px minmax(150px, 2.2fr) 64px 54px minmax(100px, 1.3fr) minmax(90px, 1fr) minmax(70px, .8fr) auto; gap: 12px; align-items: center; padding: 9px 16px; border-bottom: 1px solid var(--line); }
+  .crow:last-child { border: 0; }
+  .crow:hover { background: color-mix(in srgb, var(--panel2) 70%, transparent); }
+  .crow .nm { cursor: pointer; min-width: 0; }
+  .crow .nm b, .crow .nm small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .crow .nm small { color: var(--muted); font-size: 12px; }
+  .crow.off { opacity: .6; }
+  .crow .acts { display: flex; gap: 4px; }
+  .crow .num { font-variant-numeric: tabular-nums; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.bad { background: var(--bad); }
+  .badge { font-size: 11px; padding: 1px 8px; border-radius: 10px; background: var(--panel2); color: var(--muted); }
+  .badge.ok { color: var(--ok); } .badge.bad { color: var(--bad); } .badge.warn { color: var(--warn); }
+  .spark { width: 60px; height: 20px; display: block; }
+  .empty { padding: 40px; text-align: center; color: var(--muted); }
+  dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--text); padding: 0; box-shadow: var(--shadow); }
+  dialog::backdrop { background: rgba(5, 8, 14, .6); backdrop-filter: blur(2px); }
+  dialog.wide { width: min(1000px, 95vw); }
+  dialog.pal { width: min(560px, 94vw); margin-top: 12vh; }
+  .dhead { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .logs { margin: 0; height: 62vh; overflow: auto; font: 12px/1.45 ui-monospace, "JetBrains Mono", monospace; padding: 8px 0; background: color-mix(in srgb, var(--bg) 70%, #000); }
+  .logs div { padding: 0 14px; white-space: pre-wrap; word-break: break-all; }
+  .logs div:hover { background: var(--panel2); }
+  .logs .ts { color: var(--muted); margin-right: 10px; }
+  .logs .err { color: var(--bad); } .logs .wrn { color: var(--warn); }
+  .logs.nowrap div { white-space: pre; }
+  .kv { display: grid; grid-template-columns: 150px 1fr; gap: 6px 14px; padding: 12px 16px; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; word-break: break-all; }
+  .tabs { display: flex; gap: 4px; padding: 8px 14px 0; border-bottom: 1px solid var(--line); }
+  .tabs button { background: none; border: 0; padding: 8px 12px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; }
+  .tabs button.on { color: var(--accent); border-color: var(--accent); }
+  .scroll { max-height: 62vh; overflow: auto; }
+  .mono { font-family: ui-monospace, monospace; font-size: 12px; }
+  .plist { list-style: none; margin: 0; padding: 6px; max-height: 50vh; overflow: auto; }
+  .plist li { padding: 8px 12px; border-radius: 8px; cursor: pointer; display: flex; gap: 10px; align-items: center; }
+  .plist li.sel { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  .plist li small { margin-left: auto; color: var(--muted); }
+  .pin { width: 100%; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 14px 16px; background: transparent; }
+  #toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 50; }
+  .toast { background: var(--text); color: var(--bg); padding: 9px 14px; border-radius: 10px; max-width: 420px; box-shadow: var(--shadow); }
+  kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: 11px; }
+  .app { grid-template-columns: 220px minmax(0, 1fr); }
+  .banner { display: flex; gap: 12px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .banner b { font-size: 16px; }
+  .banner.bad { background: color-mix(in srgb, var(--bad) 12%, transparent); } .banner.warn { background: color-mix(in srgb, var(--warn) 12%, transparent); }
+  .banner.ok { background: color-mix(in srgb, var(--ok) 12%, transparent); }
+  .find { padding: 14px 16px; border-bottom: 1px solid var(--line); border-left: 3px solid var(--muted); }
+  .find.bad { border-left-color: var(--bad); } .find.warn { border-left-color: var(--warn); } .find.ok { border-left-color: var(--ok); }
+  .find .ft { display: flex; gap: 10px; align-items: center; font-size: 15px; }
+  .find p { margin: 4px 0 8px; }
+  .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 10px 0 4px; }
+  .find ul { margin: 0; padding-left: 18px; } .find li { margin: 4px 0; }
+  .cmd { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 3px 4px 3px 10px; margin-top: 4px; width: fit-content; max-width: 100%; }
+  .cmd code { font: 12px ui-monospace, monospace; overflow: auto; white-space: pre; }
+  pre.ev { margin: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: 12px/1.45 ui-monospace, monospace; white-space: pre-wrap; word-break: break-all; max-height: 160px; overflow: auto; }
+  pre.out { margin: 8px 0 0; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: 12px/1.45 ui-monospace, monospace; white-space: pre-wrap; word-break: break-all; max-height: 260px; overflow: auto; }
+  .sect { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .sect h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+  .tl { display: grid; grid-template-columns: 90px 140px 1fr; gap: 4px 10px; font-size: 13px; }
+  .shell { display: flex; gap: 8px; margin-top: 8px; }
+  .shell input { flex: 1; font-family: ui-monospace, monospace; }
+  .nav .n.bad { background: var(--bad); color: #fff; }
+  .prow { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .prow:last-child { border: 0; } .prow .why { flex: 1; min-width: 0; }
+  @media (max-width: 1180px) {
+    .crow { grid-template-columns: 12px minmax(0, 1fr) 54px minmax(90px, 1fr) auto; }
+    .crow .hide-l { display: none; }
+  }
+  @media (max-width: 860px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    aside { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 8px; }
+    .logo { padding: 0 8px; } .nav { width: auto; padding: 6px 10px; } .nav span.lbl { display: none; } .nav .n { display: none; }
+    .side-foot { flex-direction: row; border: 0; padding: 0; margin-left: auto; } .grow { display: none; }
+    section.page { padding: 14px 12px 40px; }
+    .crow { grid-template-columns: 12px minmax(0, 1fr) auto; } .crow .hide-m { display: none; }
+    .row .name { width: 45%; }
+    .grid2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="logo"><i id="logoi"></i> DockerDeck</div>
+    <div id="nav"></div>
+    <div class="grow"></div>
+    <div class="side-foot">
+      <select id="ctx" title="Docker context"></select>
+      <div class="tools" id="tools"></div>
+    </div>
+  </aside>
+  <section class="page">
+    <div class="top">
+      <h1 id="title">Overview</h1>
+      <span class="pill"><span class="live" id="live"></span><span id="livet">connecting</span></span>
+      <span class="pill" id="hostpill" style="display:none"></span>
+      <span class="sp"></span>
+      <button class="btn" id="palbtn">Search <kbd>Ctrl K</kbd></button>
+    </div>
+    <div id="view"></div>
+  </section>
+</div>
+<dialog id="dlg" class="wide"></dialog>
+<dialog id="pal" class="pal"></dialog>
+<div id="toasts"></div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
+};
+const S = {
+  ctx: null, contexts: [], tab: 'overview', containers: [], info: null, stats: {}, sys: null,
+  images: null, volumes: null, networks: null, scan: null,
+  filter: '', chip: 'all', sort: 'name', collapsed: new Set(),
+  hist: { ram: [], c: {} }, hostMem: 0, online: false, alerts: store.get('alerts') === '1', lastAlert: 0,
+};
+const HIST = 45;
+
+// ---------- small helpers ----------
+
+function h(tag, attrs = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'class') el.className = v;
+    else if (v !== false && v != null) el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(kid));
+  return el;
+}
+const ICONS = {
+  overview: 'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',
+  containers: 'M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8',
+  images: 'M12 2l10 5-10 5L2 7zM2 12l10 5 10-5M2 17l10 5 10-5',
+  volumes: 'M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6',
+  networks: 'M18 8a3 3 0 100-6 3 3 0 000 6zM6 15a3 3 0 100-6 3 3 0 000 6zM18 22a3 3 0 100-6 3 3 0 000 6zM8.6 13.5l6.8 4M15.4 6.5l-6.8 4',
+  cleanup: 'M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6',
+  play: 'M6 4l14 8-14 8z', stop: 'M6 6h12v12H6z', restart: 'M20 11a8 8 0 10-2.3 5.7M20 4v7h-7',
+  logs: 'M4 5h16M4 10h16M4 15h10M4 20h7', info: 'M12 22a10 10 0 100-20 10 10 0 000 20zM12 16v-5M12 8h.01',
+  moon: 'M12 3a9 9 0 109 9 7 7 0 01-9-9z', bell: 'M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0',
+  download: 'M12 3v12M7 10l5 5 5-5M5 21h14', pause: 'M7 5v14M17 5v14', caret: 'M6 9l6 6 6-6',
+  bug: 'M9 7a3 3 0 016 0v1H9zM7 8h10v7a5 5 0 01-10 0zM12 8v13M4 8l3 2M20 8l-3 2M3 14h4M17 14h4M4 20l3-3M20 20l-3-3M8 3l1.5 2M16 3l-1.5 2',
+  copy: 'M9 9h11v11H9zM5 15V5h10', problems: 'M12 3l10 18H2zM12 10v5M12 18h.01',
+  wrap: 'M3 6h18M3 12h15a3 3 0 010 6h-4M3 18h6M13 15l-3 3 3 3', x: 'M6 6l12 12M18 6L6 18', refresh: 'M20 11a8 8 0 10-2.3 5.7M20 4v7h-7',
+};
+function icon(name) {
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('class', 'i');
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', ICONS[name] || ''); s.append(p);
+  return s;
+}
+function ib(name, title, fn, cls = '') {
+  const b = h('button', { class: 'ib ' + cls, title, onclick: (e) => { e.stopPropagation(); fn(e); } }, icon(name));
+  return b;
+}
+function bytes(n) {
+  if (n == null || n < 0) return '-';
+  if (!n) return '0 B';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.min(Math.floor(Math.log(n) / Math.log(1024)), 4);
+  return (n / 1024 ** i).toFixed(i > 1 ? 1 : 0) + ' ' + u[i];
+}
+function ago(sec) {
+  const d = Date.now() / 1000 - sec;
+  if (d < 90) return 'just now';
+  for (const [s, l] of [[86400 * 365, 'y'], [86400 * 30, 'mo'], [86400, 'd'], [3600, 'h'], [60, 'm']]) if (d >= s) return Math.floor(d / s) + l + ' ago';
+  return '';
+}
+function toast(msg) {
+  const t = h('div', { class: 'toast' }, msg);
+  $('#toasts').append(t);
+  setTimeout(() => t.remove(), 4500);
+}
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { 'x-dockerdeck': '1', ...(opts.headers || {}) } });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || res.statusText);
+  return body;
+}
+const Q = () => 'ctx=' + encodeURIComponent(S.ctx);
+const level = (p) => (p > 85 ? 'bad' : p > 65 ? 'warn' : '');
+const colorOf = (p) => (p > 85 ? 'var(--bad)' : p > 65 ? 'var(--warn)' : 'var(--accent)');
+function bar(p) { return h('div', { class: 'bar' }, h('i', { class: level(p), style: `width:${Math.max(0, Math.min(p, 100))}%` })); }
+
+function spark(vals, color = 'var(--accent)', max) {
+  const w = 60, hh = 20;
+  const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  el.setAttribute('viewBox', `0 0 ${w} ${hh}`); el.setAttribute('class', 'spark');
+  if (vals.length < 2) return el;
+  const top = max || Math.max(...vals, 1);
+  const pts = vals.map((v, i) => `${(i / (HIST - 1) * w).toFixed(1)},${(hh - 2 - (v / top) * (hh - 4)).toFixed(1)}`).join(' ');
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  line.setAttribute('points', pts); line.setAttribute('fill', 'none'); line.setAttribute('stroke', color);
+  line.setAttribute('stroke-width', '1.5'); line.setAttribute('stroke-linejoin', 'round');
+  el.append(line);
+  return el;
+}
+function area(vals, color) {
+  const W = 600, H = 120;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('preserveAspectRatio', 'none');
+  svg.style.cssText = 'width:100%;height:120px;display:block';
+  if (vals.length < 2) return svg;
+  const pts = vals.map((v, i) => `${(i / (vals.length - 1) * W).toFixed(1)},${(H - (Math.min(v, 100) / 100) * (H - 6) - 3).toFixed(1)}`);
+  const mk = (tag, a) => { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in a) e.setAttribute(k, a[k]); return e; };
+  svg.append(mk('polygon', { points: `0,${H} ${pts.join(' ')} ${W},${H}`, fill: color, 'fill-opacity': '.15' }),
+    mk('polyline', { points: pts.join(' '), fill: 'none', stroke: color, 'stroke-width': '2', 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke' }));
+  return svg;
+}
+function gauge(title, pct, value, sub) {
+  const r = 34, c = 2 * Math.PI * r;
+  const ring = h('div', { class: 'ring' });
+  ring.innerHTML = `<svg viewBox="0 0 80 80"><circle class="bg" cx="40" cy="40" r="${r}"/><circle class="fg" cx="40" cy="40" r="${r}" stroke="${colorOf(pct)}" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${(c * (1 - Math.min(pct, 100) / 100)).toFixed(1)}"/></svg>`;
+  ring.append(h('b', {}, Math.round(pct) + '%'));
+  return h('div', { class: 'card gauge' }, ring, h('div', {}, h('div', { class: 't' }, title), h('div', { class: 'v' }, value), h('small', {}, sub)));
+}
+
+// ---------- shell: nav, tools, context ----------
+
+const TABS = [['overview', 'Overview'], ['problems', 'Problems'], ['containers', 'Containers'], ['images', 'Images'], ['volumes', 'Volumes'], ['networks', 'Networks'], ['cleanup', 'Cleanup']];
+
+let navSig = '';
+function drawNav() {
+  const count = { problems: problemsOf().length, containers: S.containers.length, images: S.images ? S.images.length : '', volumes: S.volumes ? S.volumes.length : '', networks: S.networks ? S.networks.length : '' };
+  const sig = S.tab + JSON.stringify(count);
+  if (sig === navSig) return;  // keep buttons stable so clicks never get lost
+  navSig = sig;
+  $('#nav').replaceChildren(...TABS.map(([id, label]) => h('button', { class: 'nav' + (S.tab === id ? ' on' : ''), onclick: () => go(id) },
+    icon(id), h('span', { class: 'lbl' }, label), count[id] ? h('span', { class: 'n' + (id === 'problems' ? ' bad' : '') }, count[id]) : null)));
+  $('#title').textContent = TABS.find((t) => t[0] === S.tab)[1];
+}
+function drawTools() {
+  $('#tools').replaceChildren(
+    ib('moon', 'Switch theme', () => { const t = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'; document.documentElement.dataset.theme = t; store.set('theme', t); }),
+    ib('bell', 'Memory alerts', async () => {
+      S.alerts = !S.alerts;
+      if (S.alerts && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission();
+      store.set('alerts', S.alerts ? '1' : '0'); toast('Memory alerts ' + (S.alerts ? 'on' : 'off')); drawTools();
+    }, S.alerts ? 'on' : ''));
+}
+function go(tab) { S.tab = tab; drawNav(); draw(); refresh(true); }
+
+async function loadContexts() {
+  S.contexts = await api('/api/contexts');
+  const sel = $('#ctx');
+  sel.replaceChildren(...S.contexts.map((c) => h('option', { value: c.name, disabled: !c.reachable }, c.name + (c.reachable ? '' : ' (not reachable)'))));
+  const first = S.contexts.find((c) => c.reachable && c.current) || S.contexts.find((c) => c.reachable);
+  S.ctx = first ? first.name : null;
+  if (S.ctx) sel.value = S.ctx;
+  sel.onchange = () => switchCtx(sel.value);
+}
+function switchCtx(name) {
+  S.ctx = name; $('#ctx').value = name;
+  Object.assign(S, { containers: [], stats: {}, images: null, volumes: null, networks: null, scan: null });
+  S.hist.c = {}; draw(); refresh(true);
+}
+
+// ---------- data loading ----------
+
+let statsBusy = false;
+async function refresh(force) {
+  if (!S.ctx) { S.online = false; return setLive(); }
+  try {
+    const jobs = [api(`/api/system${S.tab === 'overview' ? '?top=1' : ''}`).then((x) => { S.sys = x; S.hostMem = x.ram.total; pushRam(x); })];
+    if (['overview', 'containers', 'problems'].includes(S.tab) || force) jobs.push(api(`/api/overview?${Q()}`).then((o) => { S.containers = o.containers; S.info = o.info; }));
+    if (S.tab === 'images') jobs.push(api(`/api/images?${Q()}`).then((x) => { S.images = x; }));
+    if (S.tab === 'volumes') jobs.push(api(`/api/volumes?${Q()}`).then((x) => { S.volumes = x; }));
+    if (S.tab === 'networks') jobs.push(api(`/api/networks?${Q()}`).then((x) => { S.networks = x; }));
+    if (S.tab === 'cleanup' && (force || !S.scan)) jobs.push(api(`/api/cleanup/scan?${Q()}`).then((x) => { S.scan = x; }));
+    await Promise.all(jobs);
+    S.online = true;
+  } catch (e) { S.online = false; if (force) toast(e.message); }
+  setLive(); draw(); checkAlerts();
+  if (['overview', 'containers', 'problems'].includes(S.tab) && !statsBusy && S.online) {
+    statsBusy = true;
+    api(`/api/stats?${Q()}`).then((st) => { S.stats = st; pushHist(); draw(); }).catch(() => {}).finally(() => { statsBusy = false; });
+  }
+}
+function pushRam(x) { S.hist.ram.push(x.ram.used / x.ram.total * 100); if (S.hist.ram.length > HIST) S.hist.ram.shift(); }
+function pushHist() {
+  for (const [id, s] of Object.entries(S.stats)) {
+    const hh = (S.hist.c[id] ||= { cpu: [], mem: [] });
+    hh.cpu.push(s.cpu); hh.mem.push(s.mem);
+    if (hh.cpu.length > HIST) { hh.cpu.shift(); hh.mem.shift(); }
+  }
+}
+function setLive() {
+  $('#live').className = 'live' + (S.online ? '' : ' off');
+  $('#livet').textContent = S.online ? (S.info ? `Docker ${S.info.version}` : 'online') : 'offline';
+  const pill = $('#hostpill');
+  if (S.sys) {
+    pill.style.display = '';
+    pill.textContent = `RAM ${Math.round(S.sys.ram.used / S.sys.ram.total * 100)}%  ·  Swap ${S.sys.swap.total ? Math.round(S.sys.swap.used / S.sys.swap.total * 100) : 0}%`;
+  }
+}
+function checkAlerts() {
+  if (!S.alerts || !S.sys || Date.now() - S.lastAlert < 300000) return;
+  const ramLow = S.sys.ram.available / S.sys.ram.total < 0.08;
+  const swapHigh = S.sys.swap.total && S.sys.swap.used / S.sys.swap.total > 0.8;
+  if (!ramLow && !swapHigh) return;
+  S.lastAlert = Date.now();
+  const msg = ramLow ? 'Free RAM is under 8%.' : 'Swap is over 80% full.';
+  toast(msg);
+  if ('Notification' in window && Notification.permission === 'granted') new Notification('DockerDeck', { body: msg });
+}
+
+// ---------- actions ----------
+
+async function act(c, action, extra = '') {
+  try { await api(`/api/containers/${c.id}/${action}?${Q()}${extra}`, { method: 'POST' }); toast(`${c.name}: ${action} done`); }
+  catch (e) { toast(`${c.name}: ${e.message}`); }
+  refresh(true);
+}
+async function projectAct(name, action) {
+  if (action !== 'start' && !confirm(`${action} all running containers in "${name}"?`)) return;
+  try {
+    const r = await api(`/api/projects/${encodeURIComponent(name)}/${action}?${Q()}`, { method: 'POST' });
+    toast(`${name}: ${action} on ${r.count} container(s)${r.errors ? `, ${r.errors} failed` : ''}`);
+  } catch (e) { toast(e.message); }
+  refresh(true);
+}
+
+// ---------- views ----------
+
+function draw() {
+  setLive(); drawNav();
+  if (document.querySelector('dialog[open]')) return;
+  if (S.pressed) { S.pending = true; return; }  // never redraw under a click
+  const fn = { overview: drawOverview, problems: drawProblems, containers: drawContainers, images: drawImages, volumes: drawVolumes, networks: drawNetworks, cleanup: drawCleanup }[S.tab];
+  fn();
+}
+const view = () => $('#view');
+const noCtx = () => h('div', { class: 'card empty' }, 'No reachable Docker context. Is the Docker daemon running?');
+
+function drawOverview() {
+  const sys = S.sys;
+  if (!S.ctx) return view().replaceChildren(noCtx());
+  if (!sys) return view().replaceChildren(h('div', { class: 'empty' }, 'Loading...'));
+  const ramP = sys.ram.used / sys.ram.total * 100;
+  const swapP = sys.swap.total ? sys.swap.used / sys.swap.total * 100 : 0;
+  const diskP = sys.disk.used / sys.disk.total * 100;
+  const mp = (sys.pressure.memory.some || {}).avg60 || 0;
+  const running = S.containers.filter((c) => c.state === 'running');
+  const dockerMem = Object.values(S.stats).reduce((a, s) => a + s.mem, 0);
+
+  const tips = [];
+  if (!sys.swap.total) tips.push(['bad', 'No swap is active. A memory spike can kill apps.']);
+  else if (swapP > 60) tips.push(['bad', `Swap is ${swapP.toFixed(0)}% full. Free some RAM or add swap.`]);
+  if (ramP > 85) tips.push(['warn', `RAM is ${ramP.toFixed(0)}% used.`]);
+  if (mp > 10) tips.push(['warn', `Memory pressure is ${mp.toFixed(1)}%. Apps are waiting on memory.`]);
+  if (sys.swappiness > 30) tips.push(['warn', `Swappiness is ${sys.swappiness}. About 20 keeps apps in RAM longer.`]);
+  if (diskP > 85) tips.push(['warn', `Disk is ${diskP.toFixed(0)}% full. Try the Cleanup tab.`]);
+  for (const c of S.containers.filter((x) => x.health === 'unhealthy' || x.state === 'restarting')) tips.push(['bad', `${c.name} is ${c.health || c.state}.`]);
+  const idle = running.filter((c) => { const s = S.stats[c.id]; return s && s.cpu < 1 && s.mem > 200 * 1048576; })
+    .sort((a, b) => S.stats[b.id].mem - S.stats[a.id].mem).slice(0, 4);
+  for (const c of idle) tips.push(['warn', `${c.name} holds ${bytes(S.stats[c.id].mem)} but is idle. Stop it if you do not need it.`]);
+  if ((sys.oom || []).length) tips.push(['bad', `${sys.oom.length} app(s) were killed for lack of memory in the last 7 days.`]);
+  if (!tips.length) tips.push(['ok', 'Everything looks healthy.']);
+
+  const topC = running.filter((c) => S.stats[c.id]).sort((a, b) => S.stats[b.id].mem - S.stats[a.id].mem).slice(0, 8);
+  const maxC = topC.length ? S.stats[topC[0].id].mem : 1;
+  const maxP = (sys.top || [{ rss: 1 }])[0].rss;
+
+  const probs = problemsOf();
+  view().replaceChildren(
+    probs.length ? h('div', { class: 'card' }, h('h2', {}, 'Needs attention', h('span', { class: 'sp' }), h('button', { class: 'btn', onclick: () => go('problems') }, 'See all')),
+      probs.slice(0, 4).map(problemRow)) : document.createComment(''),
+    h('div', { class: 'grid4' },
+      gauge('RAM', ramP, bytes(sys.ram.used), `${bytes(sys.ram.available)} available of ${bytes(sys.ram.total)}`),
+      gauge('Swap', swapP, bytes(sys.swap.used), `of ${bytes(sys.swap.total)} · swappiness ${sys.swappiness}`),
+      gauge('CPU', sys.cpu, `${sys.cpu}%`, `load ${sys.load.map((x) => x.toFixed(1)).join(' ')} · ${sys.cores} cores`),
+      gauge('Disk', diskP, bytes(sys.disk.used), `of ${bytes(sys.disk.total)}`)),
+    h('div', { class: 'grid2' },
+      h('div', {},
+        h('div', { class: 'card' }, h('h2', {}, 'RAM history', h('span', { class: 'sp' }), h('span', { class: 'muted' }, `memory stall ${mp.toFixed(1)}%`)),
+          h('div', { class: 'pad' }, area(S.hist.ram, colorOf(ramP)))),
+        h('div', { class: 'card' }, h('h2', {}, 'Insights'), tips.map(([k, t]) => h('div', { class: 'tip ' + k }, t))),
+        h('div', { class: 'card' }, h('h2', {}, 'Out-of-memory kills (7 days)'),
+          (sys.oom || []).length ? h('table', {}, sys.oom.map((o) => h('tr', {}, h('td', {}, o.time.replace('T', ' ').slice(0, 19)), h('td', {}, o.name))))
+            : h('div', { class: 'empty' }, 'None.'))),
+      h('div', {},
+        h('div', { class: 'card' }, h('h2', {}, 'Top containers by memory', h('span', { class: 'sp' }),
+          h('span', { class: 'muted' }, `${running.length} running · ${bytes(dockerMem)}`)),
+          topC.length ? topC.map((c) => h('div', { class: 'row' }, h('div', { class: 'name', onclick: () => openLogs(c) }, c.name),
+            bar(S.stats[c.id].mem / maxC * 100), h('div', { class: 'val' }, bytes(S.stats[c.id].mem))))
+            : h('div', { class: 'empty' }, running.length ? 'Collecting stats...' : 'No running containers.')),
+        h('div', { class: 'card' }, h('h2', {}, 'Top programs on this machine'),
+          (sys.top || []).map((g) => h('div', { class: 'row' }, h('div', { class: 'name', style: 'cursor:default' }, `${g.name} `, h('small', { class: 'muted' }, `×${g.count}`)),
+            bar(g.rss / maxP * 100), h('div', { class: 'val' }, bytes(g.rss))))))));
+}
+
+// containers
+
+function dotClass(c) {
+  if (c.health === 'unhealthy' || c.state === 'dead') return 'bad';
+  if (c.state === 'running') return c.health === 'starting' ? 'warn' : 'ok';
+  if (c.state === 'restarting' || c.state === 'paused') return 'warn';
+  return '';
+}
+let cbuilt = false;
+function drawContainers() {
+  if (!S.ctx) return view().replaceChildren(noCtx());
+  if (!$('#clist')) {
+    cbuilt = false;
+  }
+  if (!cbuilt) {
+    const chip = (id, label) => h('button', { class: 'chip' + (S.chip === id ? ' on' : ''), onclick: () => { S.chip = id; cbuilt = false; drawContainers(); } }, label);
+    view().replaceChildren(
+      h('div', { class: 'toolbar' },
+        h('input', { class: 'field', id: 'cfilter', placeholder: 'Filter containers  ( / )', value: S.filter, style: 'min-width:240px', oninput: (e) => { S.filter = e.target.value; fillContainers(); } }),
+        h('div', { class: 'chips' }, chip('all', 'All'), chip('running', 'Running'), chip('stopped', 'Stopped'), chip('unhealthy', 'Unhealthy')),
+        h('span', { class: 'sp' }),
+        h('select', { onchange: (e) => { S.sort = e.target.value; fillContainers(); } },
+          ...[['name', 'Sort: name'], ['mem', 'Sort: memory'], ['cpu', 'Sort: CPU']].map(([v, l]) => h('option', { value: v, selected: S.sort === v }, l))),
+        h('span', { class: 'muted', id: 'csum' })),
+      h('div', { id: 'clist' }));
+    cbuilt = true;
+  }
+  fillContainers();
+}
+function fillContainers() {
+  const f = S.filter.toLowerCase();
+  const memOf = (c) => (S.stats[c.id] || {}).mem || 0;
+  const cpuOf = (c) => (S.stats[c.id] || {}).cpu || 0;
+  const list = S.containers.filter((c) => {
+    if (S.chip === 'running' && c.state !== 'running') return false;
+    if (S.chip === 'stopped' && c.state === 'running') return false;
+    if (S.chip === 'unhealthy' && c.health !== 'unhealthy' && c.state !== 'restarting') return false;
+    return !f || (c.name + c.image + c.project).toLowerCase().includes(f);
+  });
+  const cmp = S.sort === 'mem' ? (a, b) => memOf(b) - memOf(a) : S.sort === 'cpu' ? (a, b) => cpuOf(b) - cpuOf(a) : (a, b) => a.name.localeCompare(b.name);
+  const groups = {};
+  for (const c of list) (groups[c.project || 'No compose project'] ||= []).push(c);
+  const total = Object.values(S.stats).reduce((a, s) => a + s.mem, 0);
+  $('#csum').textContent = `${S.containers.filter((c) => c.state === 'running').length} running · ${bytes(total)} in use`;
+  const cards = Object.entries(groups).sort().map(([name, items]) => {
+    const mem = items.reduce((a, c) => a + memOf(c), 0);
+    const real = name !== 'No compose project';
+    const shut = S.collapsed.has(name);
+    return h('div', { class: 'card' },
+      h('div', { class: 'ghead' + (shut ? ' shut' : ''), onclick: () => { shut ? S.collapsed.delete(name) : S.collapsed.add(name); fillContainers(); } },
+        h('span', { class: 'caret' }, icon('caret')), h('b', {}, name), h('span', { class: 'muted' }, `${items.length} · ${bytes(mem)}`), h('span', { class: 'sp' }),
+        real && h('button', { class: 'btn', onclick: (e) => { e.stopPropagation(); projectAct(name, 'start'); } }, 'Start all'),
+        real && h('button', { class: 'btn', onclick: (e) => { e.stopPropagation(); projectAct(name, 'restart'); } }, 'Restart all'),
+        real && h('button', { class: 'btn danger', onclick: (e) => { e.stopPropagation(); projectAct(name, 'stop'); } }, 'Stop all')),
+      shut ? null : items.sort(cmp).map(containerRow));
+  });
+  $('#clist').replaceChildren(...(cards.length ? cards : [h('div', { class: 'card empty' }, 'No containers match.')]));
+}
+function containerRow(c) {
+  const s = S.stats[c.id], hs = S.hist.c[c.id];
+  const running = c.state === 'running';
+  const memP = s ? (s.limit ? s.mem / s.limit : s.mem / (S.hostMem || 1)) * 100 : 0;
+  return h('div', { class: 'crow' + (running ? '' : ' off') },
+    h('span', { class: 'dot ' + dotClass(c) }),
+    h('div', { class: 'nm', onclick: () => openInspect(c) }, h('b', {}, c.name), h('small', {}, c.image)),
+    h('div', { class: 'hide-m hide-l' }, hs ? spark(hs.mem, 'var(--accent)') : null),
+    h('div', { class: 'num hide-m' }, s ? s.cpu + '%' : ''),
+    h('div', { class: 'num hide-m' }, s ? [bytes(s.mem) + (s.limit ? ' / ' + bytes(s.limit) : ''), bar(memP)] : ''),
+    h('div', { class: 'hide-m hide-l' }, h('small', { class: 'muted' }, c.status.replace(/\s*\((healthy|unhealthy|health: starting)\)/, '')),
+      c.health ? h('span', { class: 'badge ' + (c.health === 'healthy' ? 'ok' : c.health === 'unhealthy' ? 'bad' : 'warn') }, ' ' + c.health) : null),
+    h('div', { class: 'hide-m hide-l muted', style: 'font-size:12px' }, c.ports.join(', ')),
+    h('div', { class: 'acts' },
+      ib('bug', 'Debug: find out why', () => openDiagnose(c)), ib('logs', 'Logs', () => openLogs(c)), ib('info', 'Details', () => openInspect(c)),
+      running ? [ib('restart', 'Restart', () => act(c, 'restart')), ib('stop', 'Stop', () => act(c, 'stop'))] : ib('play', 'Start', () => act(c, 'start')),
+      ib('cleanup', 'Remove', () => { if (confirm(`Remove container "${c.name}"?`)) act(c, 'remove', running ? '&force=1' : ''); }, 'danger')));
+}
+
+// images, volumes, networks
+
+function drawImages() {
+  if (!S.images) return view().replaceChildren(h('div', { class: 'empty' }, 'Loading...'));
+  const rows = [...S.images].sort((a, b) => b.size - a.size).map((i) => h('tr', {},
+    h('td', {}, i.tags.length ? i.tags.map((t) => h('div', {}, t)) : h('span', { class: 'muted' }, '<none>')),
+    h('td', { class: 'mono muted' }, i.id), h('td', { class: 'r' }, bytes(i.size)), h('td', {}, ago(i.created)),
+    h('td', {}, i.used_by.length ? h('span', { class: 'badge ok', title: i.used_by.join(', ') }, `${i.used_by.length} container(s)`) : h('span', { class: 'badge' }, 'unused')),
+    h('td', { class: 'r' }, ib('cleanup', i.used_by.length ? 'In use' : 'Remove image', async () => {
+      if (!confirm(`Remove image ${i.tags[0] || i.id}?`)) return;
+      try { await api(`/api/images/remove?${Q()}&id=${encodeURIComponent(i.full)}`, { method: 'POST' }); toast('Image removed'); } catch (e) { toast(e.message); }
+      refresh(true);
+    }, 'danger'))));
+  const total = S.images.reduce((a, i) => a + i.size, 0);
+  view().replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Images', h('span', { class: 'sp' }), h('span', { class: 'muted' }, `${S.images.length} · ${bytes(total)}`)),
+    h('table', {}, h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'ID'), h('th', { class: 'r' }, 'Size'), h('th', {}, 'Created'), h('th', {}, 'Used by'), h('th', {})), rows)));
+}
+function drawVolumes() {
+  if (!S.volumes) return view().replaceChildren(h('div', { class: 'empty' }, 'Loading...'));
+  const rows = [...S.volumes].sort((a, b) => b.size - a.size).map((v) => h('tr', {},
+    h('td', {}, v.anonymous ? h('span', { class: 'mono', title: v.name }, v.name.slice(0, 12) + '…') : v.name, v.anonymous ? h('span', { class: 'badge' }, ' anonymous') : null),
+    h('td', { class: 'r' }, bytes(v.size)), h('td', {}, v.driver),
+    h('td', {}, v.used_by.length ? v.used_by.join(', ') : h('span', { class: 'badge' }, 'unused')),
+    h('td', { class: 'r' }, ib('cleanup', v.used_by.length ? 'In use' : 'Remove volume', async () => {
+      if (!confirm(`Delete volume "${v.name}"?\nIts data is gone for good.`)) return;
+      try { await api(`/api/volumes/remove?${Q()}&name=${encodeURIComponent(v.name)}`, { method: 'POST' }); toast('Volume deleted'); } catch (e) { toast(e.message); }
+      refresh(true);
+    }, 'danger'))));
+  view().replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Volumes', h('span', { class: 'sp' }), h('span', { class: 'muted' }, `${S.volumes.length} · ${bytes(S.volumes.reduce((a, v) => a + Math.max(v.size, 0), 0))}`)),
+    h('table', {}, h('tr', {}, h('th', {}, 'Name'), h('th', { class: 'r' }, 'Size'), h('th', {}, 'Driver'), h('th', {}, 'Used by'), h('th', {})), rows)));
+}
+function drawNetworks() {
+  if (!S.networks) return view().replaceChildren(h('div', { class: 'empty' }, 'Loading...'));
+  view().replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Networks'),
+    h('table', {}, h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Driver'), h('th', {}, 'Scope'), h('th', {}, 'Subnet'), h('th', { class: 'r' }, 'Containers')),
+      S.networks.map((n) => h('tr', {}, h('td', {}, n.name), h('td', {}, n.driver), h('td', {}, n.scope), h('td', { class: 'mono muted' }, n.subnet || '-'), h('td', { class: 'r' }, n.containers))))));
+}
+
+// cleanup
+
+function drawCleanup() {
+  if (!S.scan) return view().replaceChildren(h('div', { class: 'empty' }, 'Scanning...'));
+  const checks = {};
+  const rows = Object.entries(S.scan).map(([k, v]) => {
+    const cb = h('input', { type: 'checkbox', disabled: !v.count, checked: k !== 'unused_images' && v.count > 0 });
+    checks[k] = cb;
+    return h('tr', {}, h('td', {}, cb), h('td', {}, h('b', {}, v.label),
+      v.items.length ? h('div', { class: 'muted', style: 'font-size:12px' }, v.items.slice(0, 6).join(', ') + (v.items.length > 6 ? ` +${v.items.length - 6} more` : '')) : null),
+      h('td', { class: 'r' }, v.count), h('td', { class: 'r' }, v.size ? bytes(v.size) : '-'));
+  });
+  const run = async () => {
+    const kinds = Object.keys(checks).filter((k) => checks[k].checked);
+    if (!kinds.length) return toast('Nothing selected.');
+    if (!confirm(`Delete: ${kinds.map((k) => S.scan[k].label).join(', ')}?\nThis cannot be undone.`)) return;
+    try {
+      const r = await api(`/api/cleanup/run?${Q()}`, { method: 'POST', body: JSON.stringify(kinds), headers: { 'content-type': 'application/json' } });
+      toast(`Freed ${bytes(r.freed)}`);
+    } catch (e) { toast(e.message); }
+    S.scan = null; drawCleanup(); refresh(true);
+  };
+  view().replaceChildren(h('div', { class: 'card' },
+    h('h2', {}, 'Cleanup preview', h('span', { class: 'sp' }), h('button', { class: 'btn', onclick: () => { S.scan = null; drawCleanup(); refresh(true); } }, 'Rescan'),
+      h('button', { class: 'btn primary', onclick: run }, 'Delete selected')),
+    h('table', {}, h('tr', {}, h('th', {}), h('th', {}, 'What'), h('th', { class: 'r' }, 'Count'), h('th', { class: 'r' }, 'Size')), rows),
+    h('div', { class: 'pad muted' }, 'Named volumes (such as database data) are never touched here. Unused tagged images are off by default.')));
+}
+
+
+// ---------- problems ----------
+
+function problemsOf() {
+  const out = [];
+  for (const c of S.containers) {
+    const code = (/Exited \((\d+)\)/.exec(c.status) || [])[1];
+    const s = S.stats[c.id];
+    let sev = null, why = '';
+    if (c.state === 'restarting') { sev = 'bad'; why = 'Restarting in a loop'; }
+    else if (c.health === 'unhealthy') { sev = 'bad'; why = 'Health check is failing'; }
+    else if (c.state === 'dead') { sev = 'bad'; why = 'Container is dead'; }
+    else if (c.state === 'exited' && code && code !== '0' && code !== '143') { sev = 'bad'; why = code === '137' ? 'Killed (exit 137). Often out of memory.' : `Stopped with an error (exit ${code})`; }
+    else if (s && s.limit && s.mem / s.limit > 0.9) { sev = 'warn'; why = 'Close to its memory limit'; }
+    else if (c.state === 'paused') { sev = 'warn'; why = 'Paused'; }
+    if (sev) out.push({ c, sev, why });
+  }
+  return out.sort((a, b) => (a.sev === 'bad' ? 0 : 1) - (b.sev === 'bad' ? 0 : 1));
+}
+function problemRow(p) {
+  const c = p.c;
+  return h('div', { class: 'prow' }, h('span', { class: 'dot ' + p.sev }),
+    h('div', { class: 'why' }, h('b', {}, c.name), h('div', { class: 'muted' }, p.why)),
+    h('button', { class: 'btn primary', onclick: () => openDiagnose(c) }, 'Debug'),
+    ib('logs', 'Logs', () => openLogs(c)),
+    c.state === 'running' ? ib('restart', 'Restart', () => act(c, 'restart')) : ib('play', 'Start', () => act(c, 'start')));
+}
+
+const deep = { running: false, done: 0, total: 0, rows: null };
+async function deepScan() {
+  const list = S.containers.filter((c) => c.state === 'running');
+  Object.assign(deep, { running: true, done: 0, total: list.length, rows: [] });
+  drawProblems();
+  let i = 0;
+  const worker = async () => {
+    while (i < list.length) {
+      const c = list[i++];
+      try {
+        const d = await api(`/api/diagnose/${c.id}?${Q()}`);
+        const fs = d.findings.filter((f) => f.sev === 'bad' || f.sev === 'warn');
+        if (fs.length) deep.rows.push({ c, fs });
+      } catch { /* skip */ }
+      deep.done++;
+      if (S.tab === 'problems' && !document.querySelector('dialog[open]')) drawProblems();
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  deep.running = false; if (S.tab === 'problems') drawProblems();
+}
+function drawProblems() {
+  if (!S.ctx) return view().replaceChildren(noCtx());
+  const probs = problemsOf();
+  view().replaceChildren(
+    h('div', { class: 'card' }, h('h2', {}, 'Needs attention now', h('span', { class: 'sp' }), h('span', { class: 'muted' }, `${probs.length} found`)),
+      probs.length ? probs.map(problemRow) : h('div', { class: 'empty' }, 'No container is failing, restarting or unhealthy right now.')),
+    h('div', { class: 'card' }, h('h2', {}, 'Deep scan of logs', h('span', { class: 'sp' }),
+      deep.running ? h('span', { class: 'muted' }, `scanning ${deep.done}/${deep.total}...`) : null,
+      h('button', { class: 'btn primary', disabled: deep.running, onclick: deepScan }, deep.rows ? 'Scan again' : 'Scan all running containers')),
+      deep.rows == null ? h('div', { class: 'empty' }, 'Reads the recent logs, health and events of every running container, and looks for known problems.')
+        : deep.rows.length ? deep.rows.map(({ c, fs }) => h('div', { class: 'prow' }, h('span', { class: 'dot ' + fs[0].sev }),
+          h('div', { class: 'why' }, h('b', {}, c.name), fs.map((f) => h('div', { class: 'muted' }, f.title))),
+          h('button', { class: 'btn primary', onclick: () => openDiagnose(c) }, 'Debug')))
+          : (deep.running ? h('div', { class: 'empty' }, 'Looking...') : h('div', { class: 'empty' }, 'No known problems found in the logs.'))));
+}
+
+// ---------- debug (diagnose) ----------
+
+function fixItem(t) {
+  const i = t.indexOf('$ ');
+  if (i < 0) return h('li', {}, t);
+  const cmd = t.slice(i + 2);
+  return h('li', {}, t.slice(0, i), h('div', { class: 'cmd' }, h('code', {}, cmd), ib('copy', 'Copy', () => navigator.clipboard.writeText(cmd).then(() => toast('Copied')))));
+}
+const SEV_WORD = { bad: 'Problem found', warn: 'Something looks wrong', info: 'For your information', ok: 'Looks healthy' };
+
+async function openDiagnose(c) {
+  const dlg = $('#dlg'); dlg.className = 'wide';
+  const body = h('div', { class: 'scroll' }, h('div', { class: 'empty' }, 'Checking logs, health, events and dependencies...'));
+  const recheck = h('button', { class: 'btn', onclick: () => run() }, 'Check again');
+  dlg.replaceChildren(h('div', { class: 'dhead' }, icon('bug'), h('b', {}, 'Debug: ' + c.name), h('span', { class: 'sp' }), recheck,
+    ib('logs', 'Live logs', () => { dlg.close(); openLogs(c); }), ib('info', 'Details', () => { dlg.close(); openInspect(c); }), ib('x', 'Close', () => dlg.close())), body);
+  dlg.onclose = () => { dlg.onclose = null; draw(); };
+  if (!dlg.open) dlg.showModal();
+
+  const doAction = async (kind, d) => {
+    try {
+      if (kind === 'start') await api(`/api/containers/${c.id}/start?${Q()}`, { method: 'POST' });
+      else if (kind === 'restart_dep') for (const x of d.deps.filter((y) => y.state !== 'running')) await api(`/api/containers/${x.id}/start?${Q()}`, { method: 'POST' });
+      toast('Done. Checking again...');
+    } catch (e) { toast(e.message); }
+    setTimeout(run, 2500);
+  };
+
+  const shellPanel = (d) => {
+    const out = h('div', {});
+    const input = h('input', { class: 'field', placeholder: 'Type a command to run inside the container, for example: ls -la /app' });
+    const go = async (cmd) => {
+      if (!cmd.trim()) return;
+      input.value = cmd; out.replaceChildren(h('div', { class: 'muted' }, 'Running...'));
+      try {
+        const r = await api(`/api/exec/${c.id}?${Q()}`, { method: 'POST', body: JSON.stringify({ cmd }), headers: { 'content-type': 'application/json' } });
+        out.replaceChildren(h('pre', { class: 'out' }, `$ ${cmd}\n${r.output || '(no output)'}\n[exit ${r.exit_code}]${r.exit_code === 127 ? '  (a tool is missing in this image. Try another check.)' : ''}`));
+      } catch (e) { out.replaceChildren(h('pre', { class: 'out' }, e.message)); }
+    };
+    input.onkeydown = (e) => { if (e.key === 'Enter') go(input.value); };
+    const presets = [['Who am I', 'id; uname -a'], ['Processes', 'ps aux 2>/dev/null || ps'], ['Disk space', 'df -h 2>&1 | head -20'],
+      ['Env names', 'env | cut -d= -f1 | sort'], ['DNS settings', 'cat /etc/resolv.conf'],
+      ['Open ports', '(ss -ltn 2>/dev/null || netstat -ltn 2>/dev/null || cat /proc/net/tcp) | head -30'],
+      ...d.deps.map((x) => [`Find ${x.service}`, `getent hosts ${x.service} || nslookup ${x.service} 2>&1 | tail -4`])];
+    if (!d.summary.running) return h('div', { class: 'muted' }, 'Start the container first. Checks run inside a running container.');
+    return h('div', {}, h('div', { class: 'chips' }, presets.map(([l, cmd]) => h('button', { class: 'chip', onclick: () => go(cmd) }, l))),
+      h('div', { class: 'shell' }, input, h('button', { class: 'btn primary', onclick: () => go(input.value) }, 'Run')), out);
+  };
+
+  async function run() {
+    recheck.disabled = true;
+    let d;
+    try { d = await api(`/api/diagnose/${c.id}?${Q()}`); }
+    catch (e) { body.replaceChildren(h('div', { class: 'empty' }, e.message)); recheck.disabled = false; return; }
+    recheck.disabled = false;
+    const top = d.findings[0], sm = d.summary;
+    const sect = (title, ...kids) => h('div', { class: 'sect' }, h('h3', {}, title), ...kids);
+    const facts = [['State', sm.status + (sm.exit_code ? ` (exit ${sm.exit_code})` : '')], ['Restarts', sm.restarts], ['Health', sm.health || 'no check'],
+      ['Restart policy', sm.restart_policy || 'no'], ['Memory limit', sm.mem_limit ? bytes(sm.mem_limit) : 'none']];
+    if (d.stats) facts.push(['CPU now', d.stats.cpu + '%'], ['Memory now', bytes(d.stats.mem)]);
+    body.replaceChildren(...[
+      h('div', { class: 'banner ' + top.sev }, h('span', { class: 'dot ' + (top.sev === 'info' ? '' : top.sev) }), h('div', {}, h('b', {}, SEV_WORD[top.sev]), h('div', { class: 'muted' }, top.title))),
+      h('div', { class: 'sect', style: 'display:flex;gap:18px;flex-wrap:wrap' }, facts.map(([k, v]) => h('div', {}, h('div', { class: 'muted', style: 'font-size:12px' }, k), h('b', {}, String(v))))),
+      d.findings.map((f) => h('div', { class: 'find ' + f.sev },
+        h('div', { class: 'ft' }, h('b', {}, f.title)), h('p', { class: 'muted' }, f.why),
+        f.fix.length ? [h('div', { class: 'lbl' }, 'What to try'), h('ul', {}, f.fix.map(fixItem))] : null,
+        f.evidence.length ? [h('div', { class: 'lbl' }, 'What the logs say'), h('pre', { class: 'ev' }, f.evidence.join('\n'))] : null,
+        f.action === 'start' && !sm.running ? h('button', { class: 'btn primary', style: 'margin-top:10px', onclick: () => doAction('start', d) }, 'Start it again') : null,
+        f.action === 'logs' ? h('button', { class: 'btn', style: 'margin-top:10px', onclick: () => { dlg.close(); openLogs(c); } }, 'Open live logs') : null,
+        f.action === 'restart_dep' ? h('button', { class: 'btn primary', style: 'margin-top:10px', onclick: () => doAction('restart_dep', d) }, 'Start the stopped dependencies') : null)),
+      d.deps.length ? sect('Depends on', h('table', {}, d.deps.map((x) => h('tr', {}, h('td', {}, x.service), h('td', {}, h('span', { class: 'badge ' + (x.state === 'running' && x.health !== 'unhealthy' ? 'ok' : 'bad') }, x.health || x.state)), h('td', { class: 'muted' }, x.name))))) : null,
+      d.health_log.length ? sect('Recent health checks', h('table', {}, d.health_log.map((x) => h('tr', {}, h('td', { class: 'muted' }, (x.time || '').slice(11, 19)),
+        h('td', {}, h('span', { class: 'badge ' + (x.exit === 0 ? 'ok' : 'bad') }, x.exit === 0 ? 'pass' : 'fail')), h('td', { class: 'mono muted' }, x.output || ''))))) : null,
+      d.timeline.length ? sect('What happened (last 24 hours)', h('div', { class: 'tl' }, d.timeline.flatMap((e) =>
+        [h('span', { class: 'muted', title: new Date(e.time * 1000).toLocaleString() }, ago(e.time)), h('b', {}, e.action), h('span', { class: 'muted' }, e.detail)]))) : null,
+      sect('Run a check inside the container', shellPanel(d)),
+      sect('Last log lines', h('pre', { class: 'ev', style: 'max-height:220px' }, d.last_logs.join('\n') || '(no logs)'))].flat().filter(Boolean));
+  }
+  run();
+}
+
+// ---------- logs ----------
+
+function openLogs(c) {
+  const dlg = $('#dlg'); dlg.className = 'wide';
+  const MAX = 3000;
+  let lines = [], es = null, filter = '', follow = true;
+  const pre = h('div', { class: 'logs' });
+  const lineEl = (raw) => {
+    const sp = raw.indexOf(' ');
+    const ts = sp > 20 ? raw.slice(11, 19) : '', msg = sp > 20 ? raw.slice(sp + 1) : raw;
+    const cls = /\b(error|fatal|panic|exception|traceback|critical)\b/i.test(msg) ? 'err' : /\bwarn(ing)?\b/i.test(msg) ? 'wrn' : '';
+    return h('div', { class: cls }, h('span', { class: 'ts' }, ts), msg);
+  };
+  const match = (l) => !filter || l.toLowerCase().includes(filter);
+  const rebuild = () => { pre.replaceChildren(...lines.filter(match).map(lineEl)); pre.scrollTop = pre.scrollHeight; };
+  const add = (batch) => {
+    const stick = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 60;
+    lines.push(...batch);
+    if (lines.length > MAX) lines = lines.slice(-MAX);
+    for (const l of batch) if (match(l)) pre.append(lineEl(l));
+    while (pre.childElementCount > MAX) pre.firstChild.remove();
+    if (stick) pre.scrollTop = pre.scrollHeight;
+  };
+  const stop = () => { if (es) { es.close(); es = null; } };
+  const start = (tail) => {
+    stop(); es = new EventSource(`/api/logs/${c.id}/stream?${Q()}&tail=${tail}`);
+    es.onmessage = (e) => add(JSON.parse(e.data));
+    es.onerror = () => { stop(); follow = false; pb.classList.remove('on'); };
+  };
+  const pb = ib('pause', 'Live follow on/off', () => { follow = !follow; pb.classList.toggle('on', follow); follow ? start(0) : stop(); }, 'on');
+  dlg.replaceChildren(
+    h('div', { class: 'dhead' }, h('b', {}, c.name), h('span', { class: 'sp' }),
+      h('input', { class: 'field', placeholder: 'Filter lines', oninput: (e) => { filter = e.target.value.toLowerCase(); rebuild(); } }),
+      pb,
+      ib('wrap', 'Wrap lines', () => pre.classList.toggle('nowrap')),
+      ib('download', 'Download', () => {
+        const a = h('a', { href: URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/plain' })), download: `${c.name}.log` }); a.click(); URL.revokeObjectURL(a.href);
+      }),
+      ib('cleanup', 'Clear view', () => { lines = []; pre.replaceChildren(); }),
+      ib('x', 'Close', () => dlg.close())),
+    pre);
+  dlg.onclose = () => { stop(); dlg.onclose = null; draw(); };
+  dlg.showModal(); start(300);
+}
+
+// ---------- inspect ----------
+
+async function openInspect(c) {
+  const dlg = $('#dlg'); dlg.className = 'wide';
+  const body = h('div', { class: 'scroll' }, h('div', { class: 'empty' }, 'Loading...'));
+  const tabs = h('div', { class: 'tabs' });
+  dlg.replaceChildren(h('div', { class: 'dhead' }, h('b', {}, c.name), h('span', { class: 'badge' }, c.id), h('span', { class: 'sp' }),
+    h('button', { class: 'btn', onclick: () => { navigator.clipboard.writeText(`docker --context ${S.ctx} exec -it ${c.name} sh`).then(() => toast('Command copied')); } }, 'Copy exec command'),
+    ib('logs', 'Logs', () => { dlg.close(); openLogs(c); }), ib('x', 'Close', () => dlg.close())), tabs, body);
+  dlg.onclose = () => { dlg.onclose = null; draw(); };
+  dlg.showModal();
+  let d;
+  try { d = await api(`/api/inspect/${c.id}?${Q()}`); } catch (e) { body.replaceChildren(h('div', { class: 'empty' }, e.message)); return; }
+  const kv = (rows) => h('dl', { class: 'kv' }, rows.filter((r) => r[1] != null && r[1] !== '').flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, v)]));
+  const secret = (e) => {
+    if (!e.secret) return e.value;
+    const s = h('span', { class: 'mono', style: 'cursor:pointer', title: 'Click to reveal' }, '••••••••');
+    s.onclick = () => { s.textContent = e.value; s.onclick = null; };
+    return s;
+  };
+  const panes = {
+    Overview: () => kv([['Image', d.image], ['State', `${d.state}${d.exit_code ? ' (exit ' + d.exit_code + ')' : ''}${d.oom_killed ? ' · killed for memory' : ''}`],
+      ['Health', d.health], ['Started', d.started], ['Restarts', String(d.restarts)], ['Restart policy', d.restart_policy],
+      ['Memory limit', d.mem_limit ? bytes(d.mem_limit) : 'none'], ['Command', (d.cmd || []).join(' ')], ['Entrypoint', (d.entrypoint || []).join(' ')],
+      ['Working dir', d.workdir], ['User', d.user], ['Ports', d.ports.join(', ')]]),
+    Environment: () => kv(d.env.map((e) => [e.key, secret(e)])),
+    Mounts: () => kv(d.mounts.map((m) => [`${m.type}${m.rw ? '' : ' (ro)'}`, `${m.src}  →  ${m.dst}`])),
+    Network: () => kv(d.networks.map((n) => [n.name, n.ip])),
+    Labels: () => kv(Object.entries(d.labels)),
+  };
+  const show = (name) => {
+    tabs.replaceChildren(...Object.keys(panes).map((k) => h('button', { class: k === name ? 'on' : '', onclick: () => show(k) }, k)));
+    body.replaceChildren(panes[name]());
+  };
+  show('Overview');
+}
+
+// ---------- palette (Ctrl+K) ----------
+
+function openPalette() {
+  const dlg = $('#pal');
+  let sel = 0, items = [];
+  const input = h('input', { class: 'field pin', placeholder: 'Jump to a page, container or context...' });
+  const ul = h('ul', { class: 'plist' });
+  const all = () => [
+    ...TABS.map(([id, l]) => ({ label: l, hint: 'page', run: () => go(id) })),
+    ...S.containers.map((c) => ({ label: c.name, hint: c.state === 'running' ? 'logs' : c.state, run: () => openLogs(c) })),
+    ...S.containers.map((c) => ({ label: `Debug ${c.name}`, hint: 'diagnose', run: () => openDiagnose(c) })),
+    ...S.contexts.filter((c) => c.reachable).map((c) => ({ label: `Context: ${c.name}`, hint: 'switch', run: () => switchCtx(c.name) })),
+    { label: 'Toggle theme', hint: 'action', run: () => $('#tools button').click() },
+  ];
+  const fill = () => {
+    const q = input.value.toLowerCase();
+    items = all().filter((i) => i.label.toLowerCase().includes(q)).slice(0, 12);
+    sel = Math.min(sel, Math.max(items.length - 1, 0));
+    ul.replaceChildren(...items.map((it, i) => h('li', { class: i === sel ? 'sel' : '', onclick: () => pick(i) }, it.label, h('small', {}, it.hint))));
+  };
+  const pick = (i) => { const it = items[i]; dlg.close(); if (it) setTimeout(it.run, 0); };
+  input.oninput = () => { sel = 0; fill(); };
+  input.onkeydown = (e) => {
+    if (e.key === 'ArrowDown') { sel = Math.min(sel + 1, items.length - 1); fill(); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { sel = Math.max(sel - 1, 0); fill(); e.preventDefault(); }
+    else if (e.key === 'Enter') pick(sel);
+  };
+  dlg.replaceChildren(input, ul); fill();
+  if (!dlg.open) dlg.showModal();
+  input.focus();
+}
+
+// ---------- start ----------
+
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); return; }
+  const typing = /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
+  if (e.key === '/' && !typing && !document.querySelector('dialog[open]')) { e.preventDefault(); if (S.tab !== 'containers') go('containers'); setTimeout(() => $('#cfilter') && $('#cfilter').focus(), 30); }
+});
+$('#palbtn').onclick = openPalette;
+document.addEventListener('pointerdown', () => { S.pressed = true; }, true);
+for (const ev of ['pointerup', 'pointercancel']) document.addEventListener(ev, () => {
+  setTimeout(() => { S.pressed = false; if (S.pending) { S.pending = false; draw(); } }, 200);
+}, true);
+$('#logoi').innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M5 12h3v3H5zm4 0h3v3H9zm4 0h3v3h-3zM9 8h3v3H9zm4 0h3v3h-3z" fill="#fff"/></svg>';
+
+(async () => {
+  const saved = store.get('theme');
+  if (saved) document.documentElement.dataset.theme = saved;
+  else if (matchMedia('(prefers-color-scheme: light)').matches) document.documentElement.dataset.theme = 'light';
+  drawNav(); drawTools();
+  try { await loadContexts(); } catch (e) { toast(e.message); }
+  await refresh(true);
+  // Poll only while the tab is visible. Hidden tab = no load on the server.
+  setInterval(() => { if (!document.hidden && !document.querySelector('dialog[open]')) refresh(false); }, 4000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(false); });
+})();
+</script>
+</body>
+</html>
