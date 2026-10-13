@@ -1,0 +1,4 @@
+.dockerdeck-label { font-weight: 600; margin-left: 4px; }
+.dockerdeck-warn { color: #ffb454; }
+.dockerdeck-bad { color: #ff6b7a; }
+.dockerdeck-offline { opacity: 0.45; }

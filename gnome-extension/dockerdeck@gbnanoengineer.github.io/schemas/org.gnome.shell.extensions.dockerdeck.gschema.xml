@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.dockerdeck" path="/org/gnome/shell/extensions/dockerdeck/">
+    <key name="url" type="s">
+      <default>"http://127.0.0.1:8787"</default>
+      <summary>DockerDeck address</summary>
+    </key>
+    <key name="interval" type="i">
+      <default>5</default>
+      <range min="2" max="300"/>
+      <summary>Refresh every N seconds</summary>
+    </key>
+    <key name="dockerdeck-dir" type="s">
+      <default>""</default>
+      <summary>Folder that holds app.py (empty means ~/dockerdeck)</summary>
+    </key>
+    <key name="show-label" type="b">
+      <default>true</default>
+      <summary>Show RAM percent in the top bar</summary>
+    </key>
+    <key name="notify" type="b">
+      <default>true</default>
+      <summary>Show a notification when a container starts failing</summary>
+    </key>
+  </schema>
+</schemalist>

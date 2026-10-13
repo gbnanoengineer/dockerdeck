@@ -77,6 +77,17 @@ Lines logged as `info` or `debug` are ignored, so normal start-up text does not 
 - Tips in plain words, like "this container is idle but holds 900 MB"
 - Optional desktop alert when RAM or swap runs low
 
+### Compose: view, up and down
+
+- Finds every compose project from your containers, including ones that use several files.
+- **View file** shows the compose file with colors and line numbers.
+  Secret values (passwords, tokens, keys) are hidden. `${VAR}` references stay visible.
+- **Up, Down, Pull, Build, Validate** run `docker compose` for you and stream the output live.
+- **Validate** checks the file without changing anything. Empty output means it is valid.
+- **Down** never deletes volumes, so your data stays. It asks first.
+- A project stays in the list after Down, so you can bring it back with one click.
+- One job at a time per project.
+
 ### Manage everything
 
 - **Containers**: start, stop, restart, remove. Grouped by compose project, with start-all and stop-all.
@@ -87,6 +98,32 @@ Lines logged as `info` or `debug` are ignored, so normal start-up text does not 
 - **Contexts**: switch between any `docker context`. Dead ones show as not reachable.
 - **Ctrl+K** to jump to anything. **/** to filter containers.
 - Dark and light theme.
+
+## GNOME top-bar extension
+
+Docker health in your top bar, for GNOME Shell on Linux.
+
+- Shows RAM percent next to an icon. It turns orange when memory is tight and red when a container fails.
+- The menu shows RAM, swap, running containers, and each failing container with its reason.
+- **Click a failing container to open its debug view** in DockerDeck.
+- Desktop notification when a container starts failing.
+- Start the DockerDeck server from the menu if it is off.
+- Settings page for the address, refresh time and notifications.
+- Light on resources: one small request every 5 seconds. It slows to every 30 seconds when the server is off.
+
+```bash
+./gnome-extension/install.sh
+```
+
+Then log out and in once (needed on Wayland), and run:
+
+```bash
+gnome-extensions enable dockerdeck@gbnanoengineer.github.io
+```
+
+**Status:** new. Built for GNOME Shell 50 (lists 48 to 50). The code, packaging and server client
+are checked, but I have not yet watched it run in a live shell on other versions.
+If it fails to load, please open an issue with the output of `journalctl -f -o cat /usr/bin/gnome-shell`.
 
 ## Quick start
 
@@ -170,6 +207,12 @@ Anything other than GET needs the header `X-DockerDeck: 1`.
 | POST | `/api/exec/{id}` | Run a command inside a container (`{"cmd": "..."}`) |
 | POST | `/api/containers/{id}/{action}` | start, stop, restart, pause, unpause, kill, remove |
 | POST | `/api/projects/{name}/{action}` | start, stop, restart a compose project |
+| GET | `/api/compose` | Compose projects, their services and containers |
+| GET | `/api/compose/{project}/file` | Compose files (secrets hidden) |
+| POST | `/api/compose/{project}/{up,down,pull,build,validate}` | Start a background job. Returns a job id |
+| POST | `/api/compose/{project}/forget` | Remove a downed project from the list |
+| GET | `/api/jobs/{id}` | Output and status of a job |
+| GET | `/api/summary` | Small status for panel widgets (used by the GNOME extension) |
 | GET | `/api/images`, `/api/volumes`, `/api/networks` | Lists |
 | GET / POST | `/api/cleanup/scan`, `/api/cleanup/run` | Preview and run cleanup |
 
@@ -183,6 +226,10 @@ Docker access is root-level. DockerDeck is built to stay on your own machine.
 - Rejects any request with a different `Host` header (blocks DNS rebinding).
 - Changes need a custom header, so other websites cannot trigger them.
 - Cleanup shows a preview and asks before it deletes. It never removes named volumes.
+- Compose files are read only from the paths Docker reports on your containers. The browser cannot ask for any other path.
+- Compose actions are started without a shell, and `down` never uses `-v`.
+- Hiding secrets in the compose view is best effort. It handles `KEY: value` and `KEY=value` lines.
+  Check before you share a screenshot.
 - Env values that look like secrets are hidden until you click them.
 - **Run a check** can run any command in your containers. Do not expose this port to a network.
 
@@ -193,6 +240,7 @@ If you put it behind a reverse proxy, add your own login first.
 - Linux only. It reads `/proc` for host numbers.
 - Connects over `unix://` and `tcp://`. `ssh://` contexts are not supported yet.
 - Needs Docker API 1.44 or newer.
+- Compose actions need the `docker compose` plugin and read access to your compose files.
 - Tested on Ubuntu with Docker 29 and Python 3.14.
 - Diagnosis is rule-based. It finds known problems well, and says "no problems found"
   when it does not know. It is a fast first look, not a replacement for reading the logs.
@@ -209,9 +257,17 @@ If you put it behind a reverse proxy, add your own login first.
 ## Ideas for later
 
 - `ssh://` contexts
-- Compose file view and `up` / `down`
 - Custom rules in a config file
 - Save history to disk for longer charts
+
+## Project layout
+
+```
+app.py                  the whole backend (standard library only)
+static/index.html       the whole frontend (no build step)
+run.sh                  starts the server
+gnome-extension/        the GNOME Shell extension and its installer
+```
 
 ## Contributing
 

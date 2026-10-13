@@ -836,6 +836,194 @@ def r_exec(h, qs, body, cid):
     return {"exit_code": info.get("ExitCode"), "output": demux(out, False)[:60000] + note}
 
 
+# ---------- compose ----------
+
+STATE_FILE = Path.home() / ".local" / "state" / "dockerdeck" / "projects.json"
+SECRET_LINE = re.compile(r"^(\s*-?\s*)(['\"]?[\w.\-]*(?:PASS|SECRET|TOKEN|KEY|PWD|CREDENTIAL|DSN)[\w.\-]*['\"]?)(\s*[:=]\s*)(.+?)\s*$", re.I)
+COMPOSE_ACTIONS = {"up": ["up", "-d"], "down": ["down"], "pull": ["pull"], "build": ["build"], "validate": ["config", "-q"]}
+JOBS = {}
+JOBS_LOCK = threading.Lock()
+
+
+def load_known():
+    try:
+        return json.loads(STATE_FILE.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def save_known(data):
+    try:
+        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = STATE_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data))
+        tmp.replace(STATE_FILE)
+    except OSError:
+        pass
+
+
+def compose_projects(ctx):
+    """Projects seen on containers. Remembered on disk so a project stays listed after 'down'."""
+    live = {}
+    for c in dk(ctx, "GET", "/containers/json?all=1"):
+        lb = c.get("Labels") or {}
+        name = lb.get("com.docker.compose.project")
+        if not name:
+            continue
+        e = live.setdefault(name, {
+            "dir": lb.get("com.docker.compose.project.working_dir", ""),
+            "files": [f for f in lb.get("com.docker.compose.project.config_files", "").split(",") if f],
+            "services": {},
+        })
+        r = short_row(c)
+        e["services"].setdefault(r["service"] or "?", []).append(
+            {"name": r["name"], "id": r["id"], "state": r["state"], "health": r["health"], "image": r["image"], "ports": r["ports"]})
+    known = load_known()
+    mine = known.setdefault(ctx, {})
+    changed = False
+    for name, e in live.items():
+        rec = {"dir": e["dir"], "files": e["files"]}
+        if e["files"] and mine.get(name) != rec:
+            mine[name] = rec
+            changed = True
+    if changed:
+        save_known(known)
+    out = []
+    for name in sorted(set(live) | set(mine)):
+        e = live.get(name) or {"dir": mine[name]["dir"], "files": mine[name]["files"], "services": {}}
+        svcs = [{"service": k, "containers": v} for k, v in sorted(e["services"].items())]
+        total = sum(len(x["containers"]) for x in svcs)
+        running = sum(1 for x in svcs for c in x["containers"] if c["state"] == "running")
+        out.append({"name": name, "dir": e["dir"], "files": e["files"], "services": svcs,
+                    "total": total, "running": running, "down": total == 0})
+    return out
+
+
+def project_of(ctx, name):
+    for p in compose_projects(ctx):
+        if p["name"] == name:
+            return p
+    raise DockerError(404, f"unknown compose project: {name}")
+
+
+def mask_secrets(text):
+    out = []
+    for line in text.splitlines():
+        m = SECRET_LINE.match(line)
+        # ${VAR} only points to a value. It is safe to show.
+        out.append(line if not m or m.group(4).startswith("${") else f"{m.group(1)}{m.group(2)}{m.group(3)}••••••")
+    return "\n".join(out)
+
+
+@route("GET", r"/api/compose")
+def r_compose(h, qs, body):
+    return compose_projects(ctx_of(qs))
+
+
+@route("GET", r"/api/compose/([a-z0-9][a-z0-9_-]*)/file")
+def r_compose_file(h, qs, body, project):
+    info = project_of(ctx_of(qs), project)
+    files = []
+    for path in info["files"]:  # only paths Docker itself reported. Never a path from the browser.
+        f = Path(path)
+        try:
+            if not f.is_file() or f.stat().st_size > 400_000:
+                raise OSError("file is missing or too large")
+            files.append({"path": path, "text": mask_secrets(f.read_text(errors="replace"))})
+        except OSError as e:
+            files.append({"path": path, "error": str(e)})
+    return {"files": files, "dir": info["dir"]}
+
+
+@route("POST", r"/api/compose/([a-z0-9][a-z0-9_-]*)/(up|down|pull|build|validate)")
+def r_compose_act(h, qs, body, project, action):
+    ctx = ctx_of(qs)
+    info = project_of(ctx, project)
+    if not info["files"]:
+        raise DockerError(409, "compose files for this project are not known")
+    with JOBS_LOCK:
+        if any(j["project"] == project and not j["done"] for j in JOBS.values()):
+            raise DockerError(409, "another job is still running for this project")
+        argv = ["docker", "--context", ctx, "compose", "--progress", "plain", "-p", project]
+        if info["dir"]:
+            argv += ["--project-directory", info["dir"]]
+        for f in info["files"]:
+            argv += ["-f", f]
+        argv += COMPOSE_ACTIONS[action]
+        jid = os.urandom(4).hex()
+        job = {"title": f"{action} {project}", "project": project, "out": "", "done": False, "code": None, "at": time.time()}
+        JOBS[jid] = job
+        for old in sorted(JOBS, key=lambda k: JOBS[k]["at"])[:-12]:
+            if JOBS[old]["done"]:
+                del JOBS[old]
+
+    def work():
+        try:
+            p = subprocess.Popen(argv, cwd=info["dir"] if Path(info["dir"]).is_dir() else None, stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT, text=True, errors="replace", env={**os.environ, "NO_COLOR": "1"})
+            for line in p.stdout:
+                job["out"] = (job["out"] + line)[-100_000:]
+            job["code"] = p.wait()
+        except OSError as e:
+            job["out"] += f"\n{e}"
+            job["code"] = -1
+        job["done"] = True
+
+    threading.Thread(target=work, daemon=True).start()
+    return {"job": jid}
+
+
+@route("GET", r"/api/jobs/([0-9a-f]{8})")
+def r_job(h, qs, body, jid):
+    j = JOBS.get(jid)
+    if not j:
+        raise DockerError(404, "unknown job")
+    return {"title": j["title"], "out": j["out"], "done": j["done"], "code": j["code"]}
+
+
+@route("POST", r"/api/compose/([a-z0-9][a-z0-9_-]*)/forget")
+def r_compose_forget(h, qs, body, project):
+    ctx = ctx_of(qs)
+    if not project_of(ctx, project)["down"]:
+        raise DockerError(409, "the project still has containers. Take it down first")
+    known = load_known()
+    known.get(ctx, {}).pop(project, None)
+    save_known(known)
+    return {"ok": True}
+
+
+# ---------- small summary for panel widgets (GNOME extension) ----------
+
+@route("GET", r"/api/summary")
+def r_summary(h, qs, body):
+    ctx = qs.get("ctx") or next((c["name"] for c in contexts() if c["current"]), "default")
+    m = meminfo()
+    rows = [short_row(c) for c in dk(ctx, "GET", "/containers/json?all=1")]
+    problems = []
+    for c in rows:
+        code = re.search(r"Exited \((\d+)\)", c["status"])
+        code = code.group(1) if code else None
+        if c["state"] == "restarting":
+            why = "Restarting in a loop"
+        elif c["health"] == "unhealthy":
+            why = "Health check is failing"
+        elif c["state"] == "dead":
+            why = "Container is dead"
+        elif c["state"] == "exited" and code not in (None, "0", "143"):
+            why = "Killed (exit 137), often out of memory" if code == "137" else f"Stopped with an error (exit {code})"
+        else:
+            continue
+        problems.append({"name": c["name"], "id": c["id"], "reason": why})
+    return {
+        "ctx": ctx,
+        "ram_pct": round((m["MemTotal"] - m["MemAvailable"]) / m["MemTotal"] * 100, 1),
+        "swap_pct": round((m["SwapTotal"] - m["SwapFree"]) / m["SwapTotal"] * 100, 1) if m["SwapTotal"] else 0,
+        "ram_used": m["MemTotal"] - m["MemAvailable"], "ram_total": m["MemTotal"],
+        "running": sum(1 for c in rows if c["state"] == "running"), "total": len(rows),
+        "problems": problems,
+    }
+
+
 @route("GET", r"/")
 def r_index(h, qs, body):
     h.reply(200, INDEX.read_bytes(), "text/html; charset=utf-8")

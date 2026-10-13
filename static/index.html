@@ -160,6 +160,15 @@
   .nav .n.bad { background: var(--bad); color: #fff; }
   .prow { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
   .prow:last-child { border: 0; } .prow .why { flex: 1; min-width: 0; }
+  .code { font: 12px/1.5 ui-monospace, "JetBrains Mono", monospace; padding: 8px 0; max-height: 62vh; overflow: auto; background: color-mix(in srgb, var(--bg) 70%, #000); }
+  .code .cl { display: flex; padding: 0 14px 0 0; white-space: pre; } .code .cl:hover { background: var(--panel2); }
+  .code .ln { width: 44px; flex: none; text-align: right; padding-right: 12px; color: var(--muted); opacity: .6; user-select: none; }
+  .c-key { color: var(--accent); } .c-cm { color: var(--muted); font-style: italic; } .c-val { color: var(--text); }
+  .svc { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr) minmax(0, 1.4fr); gap: 4px 14px; padding: 7px 16px; border-bottom: 1px solid var(--line); align-items: center; }
+  .svc:last-child { border: 0; }
+  .cname { display: flex; align-items: center; gap: 8px; }
+  .phead { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .phead b { font-size: 15px; }
   @media (max-width: 1180px) {
     .crow { grid-template-columns: 12px minmax(0, 1fr) 54px minmax(90px, 1fr) auto; }
     .crow .hide-l { display: none; }
@@ -210,7 +219,7 @@ const store = {
 };
 const S = {
   ctx: null, contexts: [], tab: 'overview', containers: [], info: null, stats: {}, sys: null,
-  images: null, volumes: null, networks: null, scan: null,
+  images: null, volumes: null, networks: null, scan: null, compose: null,
   filter: '', chip: 'all', sort: 'name', collapsed: new Set(),
   hist: { ram: [], c: {} }, hostMem: 0, online: false, alerts: store.get('alerts') === '1', lastAlert: 0,
 };
@@ -239,6 +248,7 @@ const ICONS = {
   logs: 'M4 5h16M4 10h16M4 15h10M4 20h7', info: 'M12 22a10 10 0 100-20 10 10 0 000 20zM12 16v-5M12 8h.01',
   moon: 'M12 3a9 9 0 109 9 7 7 0 01-9-9z', bell: 'M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0',
   download: 'M12 3v12M7 10l5 5 5-5M5 21h14', pause: 'M7 5v14M17 5v14', caret: 'M6 9l6 6 6-6',
+  compose: 'M6 2h9l5 5v15H6zM14 2v6h6M9 13h6M9 17h6',
   bug: 'M9 7a3 3 0 016 0v1H9zM7 8h10v7a5 5 0 01-10 0zM12 8v13M4 8l3 2M20 8l-3 2M3 14h4M17 14h4M4 20l3-3M20 20l-3-3M8 3l1.5 2M16 3l-1.5 2',
   copy: 'M9 9h11v11H9zM5 15V5h10', problems: 'M12 3l10 18H2zM12 10v5M12 18h.01',
   wrap: 'M3 6h18M3 12h15a3 3 0 010 6h-4M3 18h6M13 15l-3 3 3 3', x: 'M6 6l12 12M18 6L6 18', refresh: 'M20 11a8 8 0 10-2.3 5.7M20 4v7h-7',
@@ -318,7 +328,7 @@ function gauge(title, pct, value, sub) {
 
 // ---------- shell: nav, tools, context ----------
 
-const TABS = [['overview', 'Overview'], ['problems', 'Problems'], ['containers', 'Containers'], ['images', 'Images'], ['volumes', 'Volumes'], ['networks', 'Networks'], ['cleanup', 'Cleanup']];
+const TABS = [['overview', 'Overview'], ['problems', 'Problems'], ['containers', 'Containers'], ['compose', 'Compose'], ['images', 'Images'], ['volumes', 'Volumes'], ['networks', 'Networks'], ['cleanup', 'Cleanup']];
 
 let navSig = '';
 function drawNav() {
@@ -352,7 +362,7 @@ async function loadContexts() {
 }
 function switchCtx(name) {
   S.ctx = name; $('#ctx').value = name;
-  Object.assign(S, { containers: [], stats: {}, images: null, volumes: null, networks: null, scan: null });
+  Object.assign(S, { containers: [], stats: {}, images: null, volumes: null, networks: null, scan: null, compose: null });
   S.hist.c = {}; draw(); refresh(true);
 }
 
@@ -364,6 +374,7 @@ async function refresh(force) {
   try {
     const jobs = [api(`/api/system${S.tab === 'overview' ? '?top=1' : ''}`).then((x) => { S.sys = x; S.hostMem = x.ram.total; pushRam(x); })];
     if (['overview', 'containers', 'problems'].includes(S.tab) || force) jobs.push(api(`/api/overview?${Q()}`).then((o) => { S.containers = o.containers; S.info = o.info; }));
+    if (S.tab === 'compose') jobs.push(api(`/api/compose?${Q()}`).then((x) => { S.compose = x; }));
     if (S.tab === 'images') jobs.push(api(`/api/images?${Q()}`).then((x) => { S.images = x; }));
     if (S.tab === 'volumes') jobs.push(api(`/api/volumes?${Q()}`).then((x) => { S.volumes = x; }));
     if (S.tab === 'networks') jobs.push(api(`/api/networks?${Q()}`).then((x) => { S.networks = x; }));
@@ -427,7 +438,7 @@ function draw() {
   setLive(); drawNav();
   if (document.querySelector('dialog[open]')) return;
   if (S.pressed) { S.pending = true; return; }  // never redraw under a click
-  const fn = { overview: drawOverview, problems: drawProblems, containers: drawContainers, images: drawImages, volumes: drawVolumes, networks: drawNetworks, cleanup: drawCleanup }[S.tab];
+  const fn = { overview: drawOverview, problems: drawProblems, containers: drawContainers, compose: drawCompose, images: drawImages, volumes: drawVolumes, networks: drawNetworks, cleanup: drawCleanup }[S.tab];
   fn();
 }
 const view = () => $('#view');
@@ -565,6 +576,85 @@ function containerRow(c) {
       ib('bug', 'Debug: find out why', () => openDiagnose(c)), ib('logs', 'Logs', () => openLogs(c)), ib('info', 'Details', () => openInspect(c)),
       running ? [ib('restart', 'Restart', () => act(c, 'restart')), ib('stop', 'Stop', () => act(c, 'stop'))] : ib('play', 'Start', () => act(c, 'start')),
       ib('cleanup', 'Remove', () => { if (confirm(`Remove container "${c.name}"?`)) act(c, 'remove', running ? '&force=1' : ''); }, 'danger')));
+}
+
+// ---------- compose ----------
+
+function drawCompose() {
+  if (!S.ctx) return view().replaceChildren(noCtx());
+  if (!S.compose) return view().replaceChildren(h('div', { class: 'empty' }, 'Loading...'));
+  if (!S.compose.length) return view().replaceChildren(h('div', { class: 'card empty' }, 'No compose projects yet. Start one with "docker compose up" and it shows here.'));
+  view().replaceChildren(...S.compose.map(composeCard));
+}
+function composeCard(p) {
+  const btn = (label, fn, cls = '') => h('button', { class: 'btn ' + cls, onclick: fn }, label);
+  const badge = p.down ? h('span', { class: 'badge' }, 'down') : h('span', { class: 'badge ' + (p.running === p.total ? 'ok' : 'warn') }, `${p.running}/${p.total} running`);
+  return h('div', { class: 'card' },
+    h('div', { class: 'phead' }, icon('compose'), h('b', {}, p.name), badge, h('span', { class: 'sp' }),
+      btn('Up', () => composeAct(p, 'up'), 'primary'), btn('Down', () => composeAct(p, 'down'), 'danger'),
+      btn('Pull', () => composeAct(p, 'pull')), btn('Build', () => composeAct(p, 'build')), btn('Validate', () => composeAct(p, 'validate')),
+      btn('View file', () => openComposeFile(p)),
+      p.down ? btn('Forget', async () => { try { await api(`/api/compose/${p.name}/forget?${Q()}`, { method: 'POST' }); } catch (e) { toast(e.message); } refresh(true); }) : null),
+    h('div', { class: 'sect mono muted' }, p.dir || '(folder unknown)', p.files.length > 1 ? `  ·  ${p.files.length} files` : ''),
+    p.services.length ? p.services.map((sv) => h('div', { class: 'svc' },
+      h('b', {}, sv.service),
+      h('div', {}, sv.containers.map((c) => h('div', { class: 'cname' }, h('span', { class: 'dot ' + dotClass(c) }),
+        h('span', { style: 'cursor:pointer', onclick: () => openDiagnose(c) }, c.name), h('span', { class: 'muted' }, c.state)))),
+      h('div', { class: 'muted', style: 'font-size:12px' }, sv.containers[0].image, sv.containers[0].ports.length ? '  ·  ' + sv.containers[0].ports.join(', ') : '')))
+      : h('div', { class: 'empty' }, 'No containers. Press Up to start this project.'));
+}
+async function composeAct(p, action) {
+  const warn = { down: `Take down "${p.name}"?\nThis removes its containers and networks.\nVolumes (your data) are kept.`,
+    up: p.down ? '' : `Run "up" for "${p.name}"?\nContainers whose settings changed are re-created.` }[action];
+  if (warn && !confirm(warn)) return;
+  try {
+    const r = await api(`/api/compose/${p.name}/${action}?${Q()}`, { method: 'POST' });
+    openJob(`${action} ${p.name}`, r.job);
+  } catch (e) { toast(e.message); }
+}
+function openJob(title, jid) {
+  const dlg = $('#dlg'); dlg.className = 'wide';
+  const pre = h('pre', { class: 'out', style: 'margin:0;border:0;border-radius:0;height:56vh;max-height:56vh' }, 'Starting...');
+  const state = h('span', { class: 'badge warn' }, 'running');
+  let timer = null;
+  const close = () => dlg.close();
+  dlg.replaceChildren(h('div', { class: 'dhead' }, h('b', {}, `docker compose ${title}`), state, h('span', { class: 'sp' }), ib('x', 'Close', close)), pre);
+  dlg.onclose = () => { clearTimeout(timer); dlg.onclose = null; refresh(true); };
+  dlg.showModal();
+  const poll = async () => {
+    try {
+      const j = await api(`/api/jobs/${jid}`);
+      const stick = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 60;
+      pre.textContent = j.out || (j.done ? '(no output. For validate this means the file is valid.)' : 'Working...');
+      if (stick) pre.scrollTop = pre.scrollHeight;
+      if (j.done) { state.className = 'badge ' + (j.code === 0 ? 'ok' : 'bad'); state.textContent = j.code === 0 ? 'done' : `failed (exit ${j.code})`; return; }
+    } catch (e) { pre.textContent = e.message; return; }
+    timer = setTimeout(poll, 800);
+  };
+  poll();
+}
+function yamlLine(l) {
+  if (l.trim().startsWith('#')) return h('span', { class: 'c-cm' }, l || ' ');
+  const m = /^(\s*(?:-\s+)?)([\w.\-"'\/${}]+)(:)(\s.*|$)/.exec(l);
+  return m ? h('span', {}, m[1], h('span', { class: 'c-key' }, m[2] + m[3]), h('span', { class: 'c-val' }, m[4])) : h('span', {}, l || ' ');
+}
+async function openComposeFile(p) {
+  const dlg = $('#dlg'); dlg.className = 'wide';
+  const body = h('div', {}, h('div', { class: 'empty' }, 'Loading...'));
+  const tabs = h('div', { class: 'tabs' });
+  dlg.replaceChildren(h('div', { class: 'dhead' }, icon('compose'), h('b', {}, p.name), h('span', { class: 'sp' }),
+    h('span', { class: 'muted', style: 'font-size:12px' }, 'Secret values are hidden (best effort)'), ib('x', 'Close', () => dlg.close())), tabs, body);
+  dlg.onclose = () => { dlg.onclose = null; draw(); };
+  dlg.showModal();
+  let d;
+  try { d = await api(`/api/compose/${p.name}/file?${Q()}`); } catch (e) { body.replaceChildren(h('div', { class: 'empty' }, e.message)); return; }
+  const show = (i) => {
+    const f = d.files[i];
+    tabs.replaceChildren(...d.files.map((x, j) => h('button', { class: j === i ? 'on' : '', title: x.path, onclick: () => show(j) }, x.path.split('/').pop())));
+    body.replaceChildren(f.error ? h('div', { class: 'empty' }, `${f.path}\n${f.error}`)
+      : h('div', { class: 'code' }, f.text.split('\n').map((l, n) => h('div', { class: 'cl' }, h('span', { class: 'ln' }, n + 1), yamlLine(l)))));
+  };
+  if (d.files.length) show(0); else body.replaceChildren(h('div', { class: 'empty' }, 'No compose files are known for this project.'));
 }
 
 // images, volumes, networks
@@ -908,6 +998,13 @@ for (const ev of ['pointerup', 'pointercancel']) document.addEventListener(ev, (
 }, true);
 $('#logoi').innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M5 12h3v3H5zm4 0h3v3H9zm4 0h3v3h-3zM9 8h3v3H9zm4 0h3v3h-3z" fill="#fff"/></svg>';
 
+function applyHash() {
+  const [kind, name] = decodeURIComponent(location.hash.slice(1)).split('/');
+  if (TABS.some((t) => t[0] === kind)) go(kind);
+  if (kind === 'debug' && name) { const c = S.containers.find((x) => x.name === name); if (c) openDiagnose(c); }
+}
+addEventListener('hashchange', applyHash);
+
 (async () => {
   const saved = store.get('theme');
   if (saved) document.documentElement.dataset.theme = saved;
@@ -915,6 +1012,7 @@ $('#logoi').innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path d
   drawNav(); drawTools();
   try { await loadContexts(); } catch (e) { toast(e.message); }
   await refresh(true);
+  applyHash();
   // Poll only while the tab is visible. Hidden tab = no load on the server.
   setInterval(() => { if (!document.hidden && !document.querySelector('dialog[open]')) refresh(false); }, 4000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(false); });

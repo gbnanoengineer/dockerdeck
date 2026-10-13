@@ -1,0 +1,9 @@
+{
+  "uuid": "dockerdeck@gbnanoengineer.github.io",
+  "name": "DockerDeck",
+  "description": "Docker health in your top bar. Shows RAM, swap and running containers, warns when a container fails, and opens the DockerDeck debug view in one click.\n\nNeeds the DockerDeck server: https://github.com/gbnanoengineer/dockerdeck",
+  "shell-version": ["48", "49", "50"],
+  "url": "https://github.com/gbnanoengineer/dockerdeck",
+  "settings-schema": "org.gnome.shell.extensions.dockerdeck",
+  "version-name": "1.0.0"
+}
