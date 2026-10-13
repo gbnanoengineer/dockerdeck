@@ -37,3 +37,35 @@ export class DockerDeckClient {
         this._session = null;
     }
 }
+
+const SERVICE = 'dockerdeck.service';
+const ACTIONS = ['start', 'stop', 'restart'];
+
+/**
+ * Start, stop or restart the DockerDeck systemd user service.
+ * The command is fixed. Nothing from settings is ever run.
+ */
+export function controlService(action, cancellable = null) {
+    if (!ACTIONS.includes(action))
+        return Promise.reject(new Error(`bad action: ${action}`));
+    return new Promise((resolve, reject) => {
+        try {
+            const proc = Gio.Subprocess.new(
+                ['systemctl', '--user', action, SERVICE],
+                Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_PIPE);
+            proc.communicate_utf8_async(null, cancellable, (p, res) => {
+                try {
+                    const [, , err] = p.communicate_utf8_finish(res);
+                    if (p.get_successful())
+                        resolve();
+                    else
+                        reject(new Error((err ?? '').trim() || `systemctl ${action} failed`));
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        } catch (e) {
+            reject(e);
+        }
+    });
+}

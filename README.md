@@ -108,12 +108,18 @@ Docker health in your top bar, for GNOME Shell on Linux.
 - **Click a failing container to open its debug view** in DockerDeck.
 - Desktop notification when a container starts failing.
 - Settings page for the address, refresh time and notifications.
-- If the server is off, the menu tells you so. Start it with `./run.sh` or the systemd service above.
+- **Start, stop and restart DockerDeck from the menu**, and "Start and open dashboard".
+  One server runs both the backend API and the web page, so one click brings up everything.
+- Optional "Start DockerDeck when I log in" switch in Settings.
 - Light on resources: one small request every 5 seconds. It slows to every 30 seconds when the server is off.
 
 ```bash
 ./gnome-extension/install.sh
 ```
+
+This installs the extension and a `dockerdeck.service` for your user (it is not started or enabled
+until you ask). The extension only ever runs `systemctl --user start|stop|restart dockerdeck.service`.
+To also start on every login, run `./gnome-extension/install.sh --autostart`.
 
 Then log out and in once (needed on Wayland), and run:
 
@@ -124,6 +130,7 @@ gnome-extensions enable dockerdeck@gbnanoengineer.github.io
 **Status:** new. Built for GNOME Shell 50 (lists 48 to 50). It passes the
 [Shexli](https://pypi.org/project/shexli/) review checker with 0 findings, and the server client is tested.
 I have not yet watched it run inside a live shell, so treat it as a first release.
+The checker crashes on Python 3.14 for some inputs, so run it on Python 3.12 or 3.13.
 If it fails to load, please open an issue with the output of `journalctl -f -o cat /usr/bin/gnome-shell`.
 
 ## Quick start
@@ -143,7 +150,7 @@ To use another port: `PORT=9000 ./run.sh`
 
 ### Start on login (optional)
 
-Create `~/.config/systemd/user/dockerdeck.service`:
+`./gnome-extension/install.sh` already creates this service. To make it by hand, create `~/.config/systemd/user/dockerdeck.service`:
 
 ```ini
 [Unit]

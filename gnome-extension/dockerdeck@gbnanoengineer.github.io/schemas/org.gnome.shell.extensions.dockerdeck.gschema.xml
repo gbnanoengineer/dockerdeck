@@ -14,6 +14,10 @@
       <default>true</default>
       <summary>Show RAM percent in the top bar</summary>
     </key>
+    <key name="autostart" type="b">
+      <default>false</default>
+      <summary>Start DockerDeck when the extension loads and it is not running</summary>
+    </key>
     <key name="notify" type="b">
       <default>true</default>
       <summary>Show a notification when a container starts failing</summary>

@@ -12,7 +12,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
-import {DockerDeckClient} from './api.js';
+import {DockerDeckClient, controlService} from './api.js';
 
 const OFFLINE_DELAY = 30;  // seconds. Ask less often when the server is off.
 
@@ -29,6 +29,8 @@ class DockerDeckIndicator extends PanelMenu.Button {
         this._problemKey = '';
         this._seen = new Set();
         this._firstRun = true;
+        this._waitId = 0;
+        this._procCancellable = new Gio.Cancellable();
 
         const box = new St.BoxLayout({style_class: 'panel-status-menu-box'});
         this._icon = new St.Icon({
@@ -61,7 +63,11 @@ class DockerDeckIndicator extends PanelMenu.Button {
         });
 
         this._render();
-        this._tick();
+        // "start" does nothing if it already runs, so this is safe on every login.
+        if (this._settings.get_boolean('autostart'))
+            controlService('start', this._procCancellable).catch(() => {}).finally(() => this._tick());
+        else
+            this._tick();
     }
 
     _buildMenu() {
@@ -75,10 +81,14 @@ class DockerDeckIndicator extends PanelMenu.Button {
         this.menu.addMenuItem(this._problems);
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
+        this._startItem = this.menu.addAction('Start DockerDeck', () => this._serverAction('start', false));
+        this._startOpenItem = this.menu.addAction('Start and open dashboard', () => this._serverAction('start', true));
         this.menu.addAction('Open dashboard', () => this._open(''));
         this.menu.addAction('Problems', () => this._open('#problems'));
         this.menu.addAction('Compose projects', () => this._open('#compose'));
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        this._restartItem = this.menu.addAction('Restart DockerDeck', () => this._serverAction('restart', false));
+        this._stopItem = this.menu.addAction('Stop DockerDeck', () => this._serverAction('stop', false));
         this.menu.addAction('Settings', () => this._ext.openPreferences());
     }
 
@@ -98,6 +108,33 @@ class DockerDeckIndicator extends PanelMenu.Button {
         } catch (e) {
             Main.notify('DockerDeck', `Could not open the browser: ${e.message}`);
         }
+    }
+
+    async _serverAction(action, openAfter) {
+        try {
+            await controlService(action, this._procCancellable);
+        } catch (e) {
+            if (e.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+                return;
+            Main.notify('DockerDeck',
+                `Could not ${action} the server: ${e.message}. Run gnome-extension/install.sh once to create the service.`);
+            return;
+        }
+        // Give the server a moment, then refresh. Open the page only when it answers.
+        await this._pause(1);
+        await this._tick();
+        if (openAfter && this._online)
+            this._open('');
+    }
+
+    _pause(seconds) {
+        return new Promise(resolve => {
+            this._waitId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, seconds, () => {
+                this._waitId = 0;
+                resolve();
+                return GLib.SOURCE_REMOVE;
+            });
+        });
     }
 
     async _tick() {
@@ -157,11 +194,16 @@ class DockerDeckIndicator extends PanelMenu.Button {
         for (const c of ['dockerdeck-warn', 'dockerdeck-bad'])
             this._label.remove_style_class_name(c);
 
+        this._startItem.visible = !this._online;
+        this._startOpenItem.visible = !this._online;
+        this._restartItem.visible = this._online;
+        this._stopItem.visible = this._online;
+
         if (!s) {
             this._label.text = '';
             this._icon.add_style_class_name('dockerdeck-offline');
             this._ramItem.label.text = 'DockerDeck is not running';
-            this._dockerItem.label.text = 'Run ./run.sh in the dockerdeck folder, or check Settings';
+            this._dockerItem.label.text = 'Use Start DockerDeck below, or check the address in Settings';
             this._setProblems([]);
             return;
         }
@@ -213,10 +255,24 @@ class DockerDeckIndicator extends PanelMenu.Button {
             GLib.source_remove(this._timeoutId);
             this._timeoutId = 0;
         }
+        if (this._waitId) {
+            GLib.source_remove(this._waitId);
+            this._waitId = 0;
+        }
+        this._procCancellable.cancel();
+        this._procCancellable = null;
         this._client?.destroy();
         this._client = null;
         this._settings = null;
 
+        this._startItem?.destroy();
+        this._startItem = null;
+        this._startOpenItem?.destroy();
+        this._startOpenItem = null;
+        this._restartItem?.destroy();
+        this._restartItem = null;
+        this._stopItem?.destroy();
+        this._stopItem = null;
         this._ramItem?.destroy();
         this._ramItem = null;
         this._dockerItem?.destroy();

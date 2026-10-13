@@ -34,6 +34,13 @@ export default class DockerDeckPreferences extends ExtensionPreferences {
         settings.bind('interval', interval, 'value', Gio.SettingsBindFlags.DEFAULT);
         connection.add(interval);
 
+        const autostart = new Adw.SwitchRow({
+            title: 'Start DockerDeck when I log in',
+            subtitle: 'Uses the dockerdeck systemd user service made by gnome-extension/install.sh.',
+        });
+        settings.bind('autostart', autostart, 'active', Gio.SettingsBindFlags.DEFAULT);
+        connection.add(autostart);
+
         const look = new Adw.PreferencesGroup({title: 'Top bar'});
         page.add(look);
 
