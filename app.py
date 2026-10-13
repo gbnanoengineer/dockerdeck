@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2026 Gaurav Kumar
 """DockerDeck: tiny local dashboard for Docker.
 
 Standard library only. No background work: it only does something

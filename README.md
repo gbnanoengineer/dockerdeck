@@ -10,7 +10,7 @@ No install, no dependencies, about 30 MB of RAM.
 ![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![Dependencies](https://img.shields.io/badge/dependencies-none-2ea44f)
 ![Platform](https://img.shields.io/badge/platform-linux-informational)
-![License](https://img.shields.io/badge/license-MIT-blue)
+![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
 
 </div>
 
@@ -217,7 +217,18 @@ If you put it behind a reverse proxy, add your own login first.
 
 Issues and pull requests are welcome.
 Keep it small and dependency-free. That is the point.
+By contributing, you agree your work is released under AGPL-3.0.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+**AGPL-3.0.** DockerDeck is free and open source, and it stays that way.
+
+- You can use, study, change and share it, for free.
+- If you share a changed version, or run one as a service for other people,
+  you must publish your source under the same license.
+- You cannot take it, close it, and sell it.
+
+Running it on your own machines does not make your own projects open source.
+Only changes to DockerDeck itself must be shared.
+
+See [LICENSE](LICENSE) for the full text.
