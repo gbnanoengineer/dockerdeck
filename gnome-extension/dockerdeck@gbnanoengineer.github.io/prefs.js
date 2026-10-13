@@ -26,10 +26,6 @@ export default class DockerDeckPreferences extends ExtensionPreferences {
         settings.bind('url', url, 'text', Gio.SettingsBindFlags.DEFAULT);
         connection.add(url);
 
-        const dir = new Adw.EntryRow({title: 'DockerDeck folder (for "Start server"). Empty = ~/dockerdeck'});
-        settings.bind('dockerdeck-dir', dir, 'text', Gio.SettingsBindFlags.DEFAULT);
-        connection.add(dir);
-
         const interval = new Adw.SpinRow({
             title: 'Refresh every (seconds)',
             subtitle: 'Higher uses less CPU. It slows down by itself when the server is off.',

@@ -75,7 +75,6 @@ class DockerDeckIndicator extends PanelMenu.Button {
         this.menu.addMenuItem(this._problems);
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        this._startItem = this.menu.addAction('Start DockerDeck server', () => this._startServer());
         this.menu.addAction('Open dashboard', () => this._open(''));
         this.menu.addAction('Problems', () => this._open('#problems'));
         this.menu.addAction('Compose projects', () => this._open('#compose'));
@@ -99,37 +98,6 @@ class DockerDeckIndicator extends PanelMenu.Button {
         } catch (e) {
             Main.notify('DockerDeck', `Could not open the browser: ${e.message}`);
         }
-    }
-
-    _startServer() {
-        const dir = this._settings.get_string('dockerdeck-dir') ||
-            GLib.build_filenamev([GLib.get_home_dir(), 'dockerdeck']);
-        const script = GLib.build_filenamev([dir, 'app.py']);
-        if (!GLib.file_test(script, GLib.FileTest.EXISTS)) {
-            Main.notify('DockerDeck', `Cannot find ${script}. Set the folder in the extension settings.`);
-            return;
-        }
-        try {
-            const launcher = new Gio.SubprocessLauncher({
-                flags: Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE,
-            });
-            const port = GLib.Uri.parse(this._baseUrl(), GLib.UriFlags.NONE).get_port();
-            if (port > 0)
-                launcher.setenv('PORT', String(port), true);
-            launcher.spawnv(['python3', script]);
-        } catch (e) {
-            Main.notify('DockerDeck', `Could not start the server: ${e.message}`);
-            return;
-        }
-        this._delay(2, () => this._tick());
-    }
-
-    _delay(seconds, fn) {
-        this._startId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, seconds, () => {
-            this._startId = 0;
-            fn();
-            return GLib.SOURCE_REMOVE;
-        });
     }
 
     async _tick() {
@@ -189,13 +157,11 @@ class DockerDeckIndicator extends PanelMenu.Button {
         for (const c of ['dockerdeck-warn', 'dockerdeck-bad'])
             this._label.remove_style_class_name(c);
 
-        this._startItem.visible = !this._online;
-
         if (!s) {
             this._label.text = '';
             this._icon.add_style_class_name('dockerdeck-offline');
             this._ramItem.label.text = 'DockerDeck is not running';
-            this._dockerItem.label.text = 'Start it, or check the address in Settings';
+            this._dockerItem.label.text = 'Run ./run.sh in the dockerdeck folder, or check Settings';
             this._setProblems([]);
             return;
         }
@@ -243,14 +209,24 @@ class DockerDeckIndicator extends PanelMenu.Button {
         this._settingsIds = [];
         if (this._openId)
             this.menu.disconnect(this._openId);
-        for (const id of [this._timeoutId, this._startId]) {
-            if (id)
-                GLib.source_remove(id);
+        if (this._timeoutId) {
+            GLib.source_remove(this._timeoutId);
+            this._timeoutId = 0;
         }
-        this._timeoutId = this._startId = 0;
         this._client?.destroy();
         this._client = null;
         this._settings = null;
+
+        this._ramItem?.destroy();
+        this._ramItem = null;
+        this._dockerItem?.destroy();
+        this._dockerItem = null;
+        this._problems?.destroy();
+        this._problems = null;
+        this._label?.destroy();
+        this._label = null;
+        this._icon?.destroy();
+        this._icon = null;
         super.destroy();
     }
 });

@@ -107,8 +107,8 @@ Docker health in your top bar, for GNOME Shell on Linux.
 - The menu shows RAM, swap, running containers, and each failing container with its reason.
 - **Click a failing container to open its debug view** in DockerDeck.
 - Desktop notification when a container starts failing.
-- Start the DockerDeck server from the menu if it is off.
 - Settings page for the address, refresh time and notifications.
+- If the server is off, the menu tells you so. Start it with `./run.sh` or the systemd service above.
 - Light on resources: one small request every 5 seconds. It slows to every 30 seconds when the server is off.
 
 ```bash
@@ -121,8 +121,9 @@ Then log out and in once (needed on Wayland), and run:
 gnome-extensions enable dockerdeck@gbnanoengineer.github.io
 ```
 
-**Status:** new. Built for GNOME Shell 50 (lists 48 to 50). The code, packaging and server client
-are checked, but I have not yet watched it run in a live shell on other versions.
+**Status:** new. Built for GNOME Shell 50 (lists 48 to 50). It passes the
+[Shexli](https://pypi.org/project/shexli/) review checker with 0 findings, and the server client is tested.
+I have not yet watched it run inside a live shell, so treat it as a first release.
 If it fails to load, please open an issue with the output of `journalctl -f -o cat /usr/bin/gnome-shell`.
 
 ## Quick start
